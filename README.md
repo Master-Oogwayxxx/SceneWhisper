@@ -138,7 +138,7 @@ docker/unraid/Dockerfile
 The published image is expected at:
 
 ```text
-ghcr.io/Master-Oogwayxxx/scenewhisper:latest
+ghcr.io/master-oogwayxxx/scenewhisper:latest
 ```
 
 Template defaults:
@@ -163,14 +163,14 @@ https://github.com/Master-Oogwayxxx/SceneWhisper/tree/main/templates
 ## Maintainer Release Flow
 
 1. Push changes to `main` or run the `Publish Unraid Image` workflow manually.
-2. Confirm the GHCR package `ghcr.io/Master-Oogwayxxx/scenewhisper:latest` is public.
+2. Confirm the GHCR package `ghcr.io/master-oogwayxxx/scenewhisper:latest` is public.
 3. Validate the repository at `https://ca.unraid.net/submit/new`.
 4. Submit the public GitHub repository URL after validation passes.
 
 Before submitting to Community Applications, confirm:
 
 - `.github/workflows/publish-unraid-image.yml` is committed so GHCR publishes on `main`.
-- `ghcr.io/Master-Oogwayxxx/scenewhisper:latest` exists and is public.
+- `ghcr.io/master-oogwayxxx/scenewhisper:latest` exists and is public.
 - `ca_profile.xml` and `templates/scenewhisper.xml` use reachable raw GitHub URLs from the public repository.
 - The icon URL resolves to `app/icons/scene_whisper.png`.
 

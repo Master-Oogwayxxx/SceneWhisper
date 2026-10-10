@@ -21,9 +21,9 @@ SceneWhisper/
 │   └── docker-compose.yml
 ├── docker/
 │   └── unraid/               # Single-container Unraid image build files
-├── unraid/
-│   ├── ca_profile.xml
-│   └── templates/
+├── templates/
+│   └── scenewhisper.xml      # Community Applications Docker template
+├── ca_profile.xml            # Community Applications repository profile
 └── README.md
 ```
 
@@ -130,8 +130,8 @@ SceneWhisper includes Unraid Community Applications metadata and a dedicated
 single-container image definition:
 
 ```text
-unraid/ca_profile.xml
-unraid/templates/scenewhisper.xml
+ca_profile.xml
+templates/scenewhisper.xml
 docker/unraid/Dockerfile
 ```
 
@@ -157,7 +157,7 @@ For local template testing before Community Applications submission, add this
 template repository URL in Unraid Docker settings:
 
 ```text
-https://github.com/Master-Oogwayxxx/SceneWhisper/tree/main/unraid/templates
+https://github.com/Master-Oogwayxxx/SceneWhisper/tree/main/templates
 ```
 
 ## Maintainer Release Flow
@@ -171,7 +171,7 @@ Before submitting to Community Applications, confirm:
 
 - `.github/workflows/publish-unraid-image.yml` is committed so GHCR publishes on `main`.
 - `ghcr.io/Master-Oogwayxxx/scenewhisper:latest` exists and is public.
-- `unraid/ca_profile.xml` and `unraid/templates/scenewhisper.xml` use reachable raw GitHub URLs from the public repository.
+- `ca_profile.xml` and `templates/scenewhisper.xml` use reachable raw GitHub URLs from the public repository.
 - The icon URL resolves to `app/icons/scene_whisper.png`.
 
 ## Troubleshooting

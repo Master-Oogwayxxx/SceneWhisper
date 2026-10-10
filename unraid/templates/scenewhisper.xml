@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Container version="2">
+  <Name>SceneWhisper</Name>
+  <Repository>ghcr.io/Master-Oogwayxxx/scenewhisper:latest</Repository>
+  <Registry>https://github.com/Master-Oogwayxxx/SceneWhisper/pkgs/container/scenewhisper</Registry>
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Master-Oogwayxxx/SceneWhisper/issues</Support>
+  <Project>https://github.com/Master-Oogwayxxx/SceneWhisper</Project>
+  <Overview>AI-powered scene analysis and captioning for local video libraries. Includes a React web UI, FastAPI worker, ffmpeg processing, and optional NVIDIA GPU acceleration.</Overview>
+  <Category>MediaApp:Video Tools: Productivity: Tools:</Category>
+  <WebUI>http://[IP]:[PORT:5175]/</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/Master-Oogwayxxx/SceneWhisper/main/unraid/templates/scenewhisper.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/Master-Oogwayxxx/SceneWhisper/main/app/icons/scene_whisper.png</Icon>
+  <Requires>NVIDIA GPU users must install the NVIDIA Driver plugin and NVIDIA Container Toolkit support. CPU-only operation can set NVIDIA_VISIBLE_DEVICES to void.</Requires>
+  <Config Name="WebUI Port" Target="80" Default="5175" Mode="tcp" Description="SceneWhisper web interface." Type="Port" Display="always" Required="true" Mask="false">5175</Config>
+  <Config Name="Video Library" Target="/videos" Default="/mnt/user/videos" Mode="rw" Description="Host path containing videos to scan and process." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/videos</Config>
+  <Config Name="App Data" Target="/data" Default="/mnt/user/appdata/scenewhisper/data" Mode="rw" Description="Database, logs, and runtime state." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/scenewhisper/data</Config>
+  <Config Name="Hugging Face Cache" Target="/root/.cache/huggingface" Default="/mnt/user/appdata/scenewhisper/hf-cache" Mode="rw" Description="Model cache for Whisper and related downloads." Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/scenewhisper/hf-cache</Config>
+  <Config Name="Timezone" Target="TZ" Default="America/Los_Angeles" Mode="" Description="Container timezone." Type="Variable" Display="advanced" Required="false" Mask="false">America/Los_Angeles</Config>
+  <Config Name="Hugging Face Token" Target="HF_TOKEN" Default="" Mode="" Description="Optional token for private or rate-limited Hugging Face model access." Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="NVIDIA Visible Devices" Target="NVIDIA_VISIBLE_DEVICES" Default="all" Mode="" Description="Use all NVIDIA GPUs, a specific GPU id, or void for CPU-only mode." Type="Variable" Display="advanced" Required="false" Mask="false">all</Config>
+  <Config Name="NVIDIA Driver Capabilities" Target="NVIDIA_DRIVER_CAPABILITIES" Default="compute,utility,video" Mode="" Description="NVIDIA runtime capabilities used by AI and ffmpeg workloads." Type="Variable" Display="advanced" Required="false" Mask="false">compute,utility,video</Config>
+  <Config Name="Hugging Face Transfer" Target="HF_HUB_ENABLE_HF_TRANSFER" Default="1" Mode="" Description="Enable faster Hugging Face model downloads." Type="Variable" Display="advanced" Required="false" Mask="false">1</Config>
+</Container>

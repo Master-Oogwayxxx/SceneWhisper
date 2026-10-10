@@ -1,0 +1,60 @@
+name: SceneWhisper
+
+services:
+  backend:
+    container_name: SceneWhisper-worker
+    labels:
+      net.unraid.docker.icon: "file:///mnt/user/appdata/docker-compose-projects/SceneWhisper/icons/scene_whisper_worker.png"
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8010:8010"
+    volumes:
+      - /mnt/user/videos:/videos
+      - /mnt/user/appdata/docker-compose-projects/SceneWhisper/data:/data
+      - /mnt/user/appdata/docker-compose-projects/SceneWhisper/hf-cache:/root/.cache/huggingface
+    # GPU hosts:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # CPU-only hosts:
+    # Comment out the deploy/resources GPU reservation above, then replace
+    # NVIDIA_VISIBLE_DEVICES: all with NVIDIA_VISIBLE_DEVICES: void below.
+    environment:
+      PYTHONUNBUFFERED: "1"
+      TZ: America/Los_Angeles
+      # GPU hosts:
+      NVIDIA_VISIBLE_DEVICES: all
+      # CPU-only hosts:
+      # NVIDIA_VISIBLE_DEVICES: void
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
+      HF_HUB_ENABLE_HF_TRANSFER: "1"
+      HF_TOKEN: "${HF_TOKEN:-}"
+    restart: unless-stopped
+    networks:
+      - scene-whisper
+
+  frontend:
+    container_name: SceneWhisper
+    labels:
+      net.unraid.docker.webui: "http://[IP]:[PORT:5175]/"
+      net.unraid.docker.icon: "file:///mnt/user/appdata/docker-compose-projects/SceneWhisper/icons/scene_whisper.png"
+      net.unraid.docker.shell: "/bin/sh"
+    build:
+      context: ./frontend
+    ports:
+      - "5175:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - scene-whisper
+
+networks:
+  scene-whisper:
+    driver: bridge

@@ -1,16 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Maintainer>
-  <Profile>
-    <Name>SceneWhisper</Name>
-    <GitHub>https://github.com/Master-Oogwayxxx/SceneWhisper</GitHub>
-    <Icon>https://raw.githubusercontent.com/Master-Oogwayxxx/SceneWhisper/main/app/icons/scene_whisper.png</Icon>
-    <Support>https://github.com/Master-Oogwayxxx/SceneWhisper/issues</Support>
-  </Profile>
-  <Applications>
-    <Application>
-      <Name>SceneWhisper</Name>
-      <Repository>ghcr.io/Master-Oogwayxxx/scenewhisper:latest</Repository>
-      <TemplateURL>https://raw.githubusercontent.com/Master-Oogwayxxx/SceneWhisper/main/unraid/templates/scenewhisper.xml</TemplateURL>
-    </Application>
-  </Applications>
-</Maintainer>
+<CommunityApplications>
+  <Profile>SceneWhisper provides Docker and Unraid templates for an AI-powered local video processing application with a React web UI, FastAPI worker, ffmpeg processing, and optional NVIDIA GPU acceleration.</Profile>
+  <Icon>https://raw.githubusercontent.com/Master-Oogwayxxx/SceneWhisper/main/app/icons/scene_whisper.png</Icon>
+  <WebPage>https://github.com/Master-Oogwayxxx/SceneWhisper</WebPage>
+  <Forum>https://github.com/Master-Oogwayxxx/SceneWhisper/issues</Forum>
+</CommunityApplications>

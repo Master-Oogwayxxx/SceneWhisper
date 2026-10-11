@@ -2,15 +2,16 @@ export const API_BASE = (import.meta as any).env.VITE_API_URL || '/api'
 
 export function apiUrl(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  return `${API_BASE}${normalizedPath}`
+  return `${API_BASE.replace(/\/+$/, '')}${normalizedPath}`
 }
 
 export function apiWebSocketUrl(path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const normalizedBase = API_BASE.replace(/\/+$/, '')
   if (API_BASE.startsWith('http')) {
-    return `${API_BASE.replace(/^http/, 'ws')}${normalizedPath}`
+    return `${normalizedBase.replace(/^http/, 'ws')}${normalizedPath}`
   }
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${protocol}//${window.location.host}${API_BASE}${normalizedPath}`
+  return `${protocol}//${window.location.host}${normalizedBase}${normalizedPath}`
 }

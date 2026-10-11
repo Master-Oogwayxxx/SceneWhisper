@@ -1,7 +1,7 @@
 import { Task, AddTaskResponse, TaskStatus, TasksResponse } from '@/types/types'
 import type { TaskFilters } from '@/components/TaskFilterDialog'
 
-import { API_BASE } from '@/api/client'
+import { API_BASE, apiUrl } from '@/api/client'
 
 export const taskApi = {
   async getFileBadgeTasks(signal?: AbortSignal): Promise<Task[]> {
@@ -17,7 +17,7 @@ export const taskApi = {
     const timeout = setTimeout(() => controller.abort(), 15000)
 
     try {
-      const url = new URL(`${API_BASE}/tasks`)
+      const url = new URL(apiUrl('/tasks'), window.location.origin)
       url.searchParams.append('skip', skip.toString())
       url.searchParams.append('limit', limit.toString())
       if (status) {

@@ -1,9 +1,143 @@
 # SceneWhisper
 
-SceneWhisper is a Docker Compose packaged video processing app with a Python
-FastAPI backend worker and a browser-based frontend service. This repository is
-organized for Unraid and Docker deployment, including Community Applications
-template files and a GHCR release workflow.
+SceneWhisper is a self-hosted video processing app for local media libraries.
+It combines a React web UI, a FastAPI worker/API, ffmpeg processing, scene
+detection, subtitle tooling, and optional NVIDIA GPU acceleration.
+
+This repository is packaged for two public deployment paths:
+
+- Unraid Community Applications / Docker template: one published container image.
+- Docker Compose: separate frontend and backend services for local development or
+  custom Docker hosts.
+
+## Features
+
+- Scan local video libraries and track processed files.
+- Run scene detection, video splitting, subtitle generation, and subtitle cleanup
+  workflows.
+- Manage processing tasks, queue state, logs, deleted file history, and runtime
+  settings from the browser UI.
+- Use GPU acceleration on hosts with NVIDIA drivers and the NVIDIA Container
+  Toolkit, or run in CPU-only mode.
+- Cache Hugging Face models on a persistent volume so downloads survive container
+  updates.
+
+## Quick Start on Unraid
+
+Install from Community Applications when the template is available there, or add
+the template repository manually in Unraid Docker settings:
+
+```text
+https://github.com/Master-Oogwayxxx/SceneWhisper/tree/main/templates
+```
+
+The Unraid template uses this published image:
+
+```text
+ghcr.io/master-oogwayxxx/scenewhisper:latest
+```
+
+Default template values:
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| Web UI Port | `5175` | Browser interface |
+| Video Library | `/mnt/user/videos` -> `/videos` | Videos to scan and process |
+| App Data | `/mnt/user/appdata/scenewhisper/data` -> `/data` | Database, logs, and runtime state |
+| Hugging Face Cache | `/mnt/user/appdata/scenewhisper/hf-cache` -> `/root/.cache/huggingface` | Model cache |
+| Timezone | `America/Los_Angeles` | Container timezone |
+| Hugging Face Token | empty | Optional private/rate-limited model access |
+| NVIDIA Visible Devices | `all` | GPU selection, or `void` for CPU-only |
+
+After the container starts, open:
+
+```text
+http://<your-unraid-ip>:5175
+```
+
+For GPU hosts, install the Unraid NVIDIA Driver plugin and confirm Docker GPU
+runtime support before troubleshooting SceneWhisper. CPU-only hosts can set
+`NVIDIA_VISIBLE_DEVICES` to `void` in the template advanced settings.
+
+## Docker Compose
+
+Clone the repository:
+
+```bash
+git clone https://github.com/Master-Oogwayxxx/SceneWhisper.git
+cd SceneWhisper/app
+```
+
+Build and start the stack:
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+The Compose services are:
+
+- `SceneWhisper-worker`: backend API and worker on `http://localhost:8010`
+- `SceneWhisper`: frontend UI on `http://localhost:5175`
+
+Useful Compose commands:
+
+```bash
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose down
+```
+
+The Compose file uses these default host paths:
+
+| Host path | Container path | Purpose |
+| --- | --- | --- |
+| `/mnt/user/videos` | `/videos` | Video library |
+| `/mnt/user/appdata/docker-compose-projects/SceneWhisper/data` | `/data` | Runtime app data |
+| `/mnt/user/appdata/docker-compose-projects/SceneWhisper/hf-cache` | `/root/.cache/huggingface` | Hugging Face model cache |
+
+Update `app/docker-compose.yml` if your videos, app data, ports, or GPU settings
+differ from the defaults.
+
+## GPU and CPU Notes
+
+GPU hosts use all available NVIDIA GPUs by default:
+
+```yaml
+NVIDIA_VISIBLE_DEVICES: all
+NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
+```
+
+For CPU-only Compose hosts, remove or comment the GPU device reservation in
+`app/docker-compose.yml` and set:
+
+```yaml
+NVIDIA_VISIBLE_DEVICES: void
+```
+
+Verify Docker GPU access with:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi
+```
+
+## Local Development
+
+Backend commands run from `app/backend`:
+
+```bash
+uv run pytest
+uv run uvicorn main:app --reload --host 0.0.0.0 --port 8010
+```
+
+Frontend commands run from `app/frontend`:
+
+```bash
+npm run dev
+npm run build
+npm run lint
+npm test
+```
 
 ## Project Layout
 
@@ -16,7 +150,7 @@ SceneWhisper/
 │   │   ├── main.py
 │   │   ├── pyproject.toml
 │   │   └── Dockerfile
-│   ├── frontend/             # Frontend container build context
+│   ├── frontend/             # React + Vite + TypeScript UI
 │   ├── icons/                # Unraid Docker icons
 │   └── docker-compose.yml
 ├── docker/
@@ -27,170 +161,45 @@ SceneWhisper/
 └── README.md
 ```
 
-## Prerequisites
+Backend source lives under `app/backend/src`, split into `api`, `crud`,
+`models`, `schemas`, and `workers`. Backend tests live in `app/backend/tests`.
+Frontend source lives under `app/frontend/src`, with API clients in `src/api`,
+feature components in `src/components`, and shared UI primitives in
+`src/components/ui`.
 
-- Docker
-- Docker Compose v2
-- NVIDIA drivers and NVIDIA Container Toolkit for GPU acceleration
-- `uv` for local backend development and tests
+## Troubleshooting
 
-Check the host tools:
+If the web UI does not load, confirm the container is running and that port
+`5175` is not already in use.
+
+If the backend is unreachable, check backend logs and confirm port `8010` is
+available for Compose deployments.
+
+If the GPU is not detected, confirm NVIDIA drivers and container runtime support:
 
 ```bash
-docker --version
-docker compose version
 nvidia-smi
-```
-
-## Docker Compose
-
-Clone the repository:
-
-```bash
-git clone git@github.com:Master-Oogwayxxx/SceneWhisper.git
-cd SceneWhisper
-```
-
-Run Compose commands from the `app` directory:
-
-```bash
-cd app
-docker compose build
-docker compose up -d
-```
-
-The default services are:
-
-- `SceneWhisper-worker`: backend API and worker on `http://localhost:8010`
-- `SceneWhisper`: frontend UI on `http://localhost:5175`
-
-Stop the stack:
-
-```bash
-docker compose down
-```
-
-Follow logs:
-
-```bash
-docker compose logs -f backend
-docker compose logs -f frontend
-```
-
-## Volumes and Ports
-
-The Compose file uses these defaults:
-
-| Host path | Container path | Purpose |
-| --- | --- | --- |
-| `/mnt/user/videos` | `/videos` | Video library |
-| `/mnt/user/appdata/docker-compose-projects/SceneWhisper/data` | `/data` | Runtime app data |
-| `/mnt/user/appdata/docker-compose-projects/SceneWhisper/hf-cache` | `/root/.cache/huggingface` | Hugging Face model cache |
-
-Default ports:
-
-- Frontend: `5175`
-- Backend: `8010`
-
-## GPU and CPU Hosts
-
-GPU hosts use all available NVIDIA GPUs by default:
-
-```yaml
-NVIDIA_VISIBLE_DEVICES: all
-NVIDIA_DRIVER_CAPABILITIES: compute,utility,video
-```
-
-For CPU-only hosts, remove or comment the Compose GPU device reservation and set:
-
-```yaml
-NVIDIA_VISIBLE_DEVICES: void
-```
-
-You can verify Docker GPU access with:
-
-```bash
 docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi
 ```
 
-## Backend Development
-
-Run backend commands from `app/backend`:
-
-```bash
-uv run pytest
-uv run uvicorn main:app --reload --host 0.0.0.0 --port 8010
-```
-
-Backend source is under `app/backend/src`, with tests in `app/backend/tests`.
-
-## Unraid Community Applications
-
-SceneWhisper includes Unraid Community Applications metadata and a dedicated
-single-container image definition:
-
-```text
-ca_profile.xml
-templates/scenewhisper.xml
-docker/unraid/Dockerfile
-```
-
-The published image is expected at:
-
-```text
-ghcr.io/master-oogwayxxx/scenewhisper:latest
-```
-
-Template defaults:
-
-- Web UI: `http://[IP]:5175`
-- Video library: `/mnt/user/videos` mapped to `/videos`
-- App data: `/mnt/user/appdata/scenewhisper/data` mapped to `/data`
-- Model cache: `/mnt/user/appdata/scenewhisper/hf-cache`
-- Optional secret: `HF_TOKEN`
-
-Unraid GPU users should install the NVIDIA Driver plugin and confirm Docker GPU
-runtime support is available. CPU-only users can set `NVIDIA_VISIBLE_DEVICES` to
-`void` in the template advanced settings.
-
-For local template testing before Community Applications submission, add this
-template repository URL in Unraid Docker settings:
-
-```text
-https://github.com/Master-Oogwayxxx/SceneWhisper/tree/main/templates
-```
+If models fail to download, check network access, free disk space in the Hugging
+Face cache volume, and whether your chosen model requires `HF_TOKEN`.
 
 ## Maintainer Release Flow
 
 1. Push changes to `main` or run the `Publish Unraid Image` workflow manually.
-2. Confirm the GHCR package `ghcr.io/master-oogwayxxx/scenewhisper:latest` is public.
+2. Confirm the GHCR package `ghcr.io/master-oogwayxxx/scenewhisper:latest` is
+   public.
 3. Validate the repository at `https://ca.unraid.net/submit/new`.
 4. Submit the public GitHub repository URL after validation passes.
 
 Before submitting to Community Applications, confirm:
 
-- `.github/workflows/publish-unraid-image.yml` is committed so GHCR publishes on `main`.
-- `ghcr.io/master-oogwayxxx/scenewhisper:latest` exists and is public.
-- `ca_profile.xml` and `templates/scenewhisper.xml` use reachable raw GitHub URLs from the public repository.
+- `.github/workflows/publish-unraid-image.yml` is committed.
+- `ca_profile.xml` exists at the repository root.
+- `templates/scenewhisper.xml` is the only Community Applications template.
+- Raw GitHub URLs in the XML files resolve from the public repository.
 - The icon URL resolves to `app/icons/scene_whisper.png`.
-
-## Troubleshooting
-
-If the GPU is not detected, confirm the NVIDIA Container Toolkit is installed and
-Docker has been restarted:
-
-```bash
-sudo apt install nvidia-container-toolkit
-sudo systemctl restart docker
-```
-
-If a port is already in use, check the conflicting process or change the port
-mapping in `app/docker-compose.yml`:
-
-```bash
-lsof -i :8010
-lsof -i :5175
-```
 
 ## License
 

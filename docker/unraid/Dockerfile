@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y \
     nginx \
     supervisor \
     tzdata \
+    && rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-available/default \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/backend

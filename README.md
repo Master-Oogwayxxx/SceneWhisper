@@ -1,19 +1,16 @@
 # SceneWhisper
 
-SceneWhisper is a self-hosted video processing app for local media libraries.
+SceneWhisper is a self-hosted video processing app for local and JAV video
+libraries.
 It combines a React web UI, a FastAPI worker/API, ffmpeg processing, scene
 detection, subtitle tooling, and optional NVIDIA GPU acceleration.
 
-This repository is packaged for two public deployment paths:
-
-- Unraid Community Applications / Docker template: one published container image.
-- Docker Compose: separate frontend and backend services for local development or
-  custom Docker hosts.
-
 ## Features
 
-- Scan local video libraries and track processed files.
+- Scan local and JAV video libraries and track processed files.
 - Run scene detection, video splitting, subtitle generation, and subtitle cleanup
+  workflows.
+- Organize JAV collections with browser-based library management and metadata
   workflows.
 - Manage processing tasks, queue state, logs, deleted file history, and runtime
   settings from the browser UI.
@@ -39,15 +36,15 @@ ghcr.io/master-oogwayxxx/scenewhisper:latest
 
 Default template values:
 
-| Setting | Default | Purpose |
-| --- | --- | --- |
-| Web UI Port | `5175` | Browser interface |
-| Video Library | `/mnt/user/videos` -> `/videos` | Videos to scan and process |
-| App Data | `/mnt/user/appdata/scenewhisper/data` -> `/data` | Database, logs, and runtime state |
-| Hugging Face Cache | `/mnt/user/appdata/scenewhisper/hf-cache` -> `/root/.cache/huggingface` | Model cache |
-| Timezone | `America/Los_Angeles` | Container timezone |
-| Hugging Face Token | empty | Optional private/rate-limited model access |
-| NVIDIA Visible Devices | `all` | GPU selection, or `void` for CPU-only |
+| Setting                | Default                                                                 | Purpose                                    |
+| ---------------------- | ----------------------------------------------------------------------- | ------------------------------------------ |
+| Web UI Port            | `5175`                                                                  | Browser interface                          |
+| Video Library          | `/mnt/user/videos` -> `/videos`                                         | Local/JAV videos to scan and process       |
+| App Data               | `/mnt/user/appdata/scenewhisper/data` -> `/data`                        | Database, logs, and runtime state          |
+| Hugging Face Cache     | `/mnt/user/appdata/scenewhisper/hf-cache` -> `/root/.cache/huggingface` | Model cache                                |
+| Timezone               | `America/Los_Angeles`                                                   | Container timezone                         |
+| Hugging Face Token     | empty                                                                   | Optional private/rate-limited model access |
+| NVIDIA Visible Devices | `all`                                                                   | GPU selection, or `void` for CPU-only      |
 
 After the container starts, open:
 
@@ -90,10 +87,10 @@ docker compose down
 
 The Compose file uses these default host paths:
 
-| Host path | Container path | Purpose |
-| --- | --- | --- |
-| `/mnt/user/videos` | `/videos` | Video library |
-| `/mnt/user/appdata/docker-compose-projects/SceneWhisper/data` | `/data` | Runtime app data |
+| Host path                                                         | Container path             | Purpose                  |
+| ----------------------------------------------------------------- | -------------------------- | ------------------------ |
+| `/mnt/user/videos`                                                | `/videos`                  | Local/JAV video library  |
+| `/mnt/user/appdata/docker-compose-projects/SceneWhisper/data`     | `/data`                    | Runtime app data         |
 | `/mnt/user/appdata/docker-compose-projects/SceneWhisper/hf-cache` | `/root/.cache/huggingface` | Hugging Face model cache |
 
 Update `app/docker-compose.yml` if your videos, app data, ports, or GPU settings
@@ -184,22 +181,6 @@ docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi
 
 If models fail to download, check network access, free disk space in the Hugging
 Face cache volume, and whether your chosen model requires `HF_TOKEN`.
-
-## Maintainer Release Flow
-
-1. Push changes to `main` or run the `Publish Unraid Image` workflow manually.
-2. Confirm the GHCR package `ghcr.io/master-oogwayxxx/scenewhisper:latest` is
-   public.
-3. Validate the repository at `https://ca.unraid.net/submit/new`.
-4. Submit the public GitHub repository URL after validation passes.
-
-Before submitting to Community Applications, confirm:
-
-- `.github/workflows/publish-unraid-image.yml` is committed.
-- `ca_profile.xml` exists at the repository root.
-- `templates/scenewhisper.xml` is the only Community Applications template.
-- Raw GitHub URLs in the XML files resolve from the public repository.
-- The icon URL resolves to `app/icons/scene_whisper.png`.
 
 ## License
 

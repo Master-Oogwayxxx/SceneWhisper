@@ -983,7 +983,13 @@ export function ScraperTab({
               />
             ))}
           {!sourcesQuery.isLoading && sources.length === 0 && (
-            <div className="rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground">No scraper sources yet.</div>
+            <div className="col-span-full flex min-h-[280px] flex-col items-center justify-center rounded-md border border-dashed border-border p-8 text-center">
+              <Search className="mb-4 h-12 w-12 text-muted-foreground/50" />
+              <h3 className="mb-1 text-lg font-medium">No Scraper Sources</h3>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Add scraper sources to help manage JAV videos by tracking actress pages or saved searches, running scheduled scraping jobs, and reviewing newly found videos in one place.
+              </p>
+            </div>
           )}
           {!sourcesQuery.isLoading && sources.length > 0 && filteredSources.length === 0 && (
             <div className="rounded-md border border-dashed border-border p-6 text-sm text-muted-foreground">No scraper sources match this search.</div>

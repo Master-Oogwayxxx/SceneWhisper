@@ -7,7 +7,7 @@
   <Privileged>false</Privileged>
   <Support>https://github.com/Master-Oogwayxxx/SceneWhisper/issues</Support>
   <Project>https://github.com/Master-Oogwayxxx/SceneWhisper</Project>
-  <Overview>AI-powered scene analysis and captioning for local video libraries. Includes a React web UI, FastAPI worker, ffmpeg processing, and optional NVIDIA GPU acceleration.</Overview>
+  <Overview>SceneWhisper is a self-hosted video processing suite for local media libraries, including JAV video collections. Scan and manage video folders, queue scene detection and splitting jobs, generate and clean subtitles with Whisper, repair frame pacing, review processing status, and work with scraped/R18 metadata. The Unraid container bundles the React web interface, FastAPI worker, ffmpeg processing, persistent app data, Hugging Face model caching, and optional NVIDIA GPU acceleration.</Overview>
   <Category>MediaApp:Video Tools: Productivity: Tools:</Category>
   <WebUI>http://[IP]:[PORT:5175]/</WebUI>
   <TemplateURL>https://raw.githubusercontent.com/Master-Oogwayxxx/SceneWhisper/main/templates/scenewhisper.xml</TemplateURL>

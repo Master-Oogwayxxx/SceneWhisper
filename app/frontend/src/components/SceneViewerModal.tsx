@@ -6,29 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { File, Scene } from '@/types/types';
 import { sceneApi } from '@/api/scenes';
-import { API_BASE } from '@/api/client';
+import { apiUrl } from '@/api/client';
 import { timecodeToSeconds, secondsToTimecode, isValidTimecode } from '@/lib/timecode';
 import { copyTextToClipboard } from '@/lib/utils';
 import { Check, Copy, Crosshair, Loader2, Maximize2, Minimize2, Play, Trash2 } from 'lucide-react';
 import { SceneTimeline } from './SceneTimeline';
-import { MediaPlayer, MediaProvider, useMediaStore, isVideoProvider, type MediaPlayerInstance, type MediaProviderAdapter, type VideoMimeType } from '@vidstack/react';
+import { MediaPlayer, MediaProvider, useMediaStore, isVideoProvider, type MediaPlayerInstance, type MediaProviderAdapter } from '@vidstack/react';
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
 import { TextTrack } from '@vidstack/react';
 
 const DEFAULT_NEW_SCENE_DURATION_SECONDS = 300;
 const DESKTOP_MEDIA_QUERY = '(min-width: 768px)';
 
-const VIDEO_SOURCE_TYPES: Record<string, VideoMimeType> = {
-  '.avi': 'video/avi',
-  '.3gp': 'video/3gp',
-  '.m4v': 'video/mp4',
-  '.mov': 'video/mp4',
-  '.mp4': 'video/mp4',
-  '.mpeg': 'video/mpeg',
-  '.mpg': 'video/mpeg',
-  '.ogv': 'video/ogg',
-  '.webm': 'video/webm',
-};
 
 interface SceneViewerModalProps {
   file: File | null;
@@ -42,10 +31,6 @@ function formatDuration(seconds: number): string {
 
 function formatPlaybackTime(seconds: number): string {
   return secondsToTimecode(Number.isFinite(seconds) ? Math.max(0, seconds) : 0);
-}
-
-function getVideoSourceType(file: File): VideoMimeType {
-  return VIDEO_SOURCE_TYPES[file.format?.toLowerCase()] ?? 'video/mp4';
 }
 
 function shouldUseFullscreenByDefault(): boolean {
@@ -137,11 +122,11 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
   const videoSource = useMemo(() => {
     if (!file) return undefined;
 
-    return {
-      src: `${API_BASE}/files/${file.id}/stream`,
-      type: getVideoSourceType(file),
-    };
-  }, [file?.id, file?.format]);
+    // The endpoint has no media extension. Let the browser use the
+    // Content-Type returned by the streaming route instead of forcing a
+    // decoder based on a possibly missing or stale database format.
+    return apiUrl(`/files/${encodeURIComponent(file.id)}/stream`);
+  }, [file?.id]);
 
   const { data: scenes, isLoading, isError } = useQuery<Scene[]>({
     queryKey: ['scenes', file?.id],

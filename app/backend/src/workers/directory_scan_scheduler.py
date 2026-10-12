@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import urllib.request
 from urllib.parse import quote
 from datetime import datetime, timezone
@@ -13,7 +14,8 @@ from ..crud.setting import get_settings, patch_settings
 from ..utils import calculate_next_run, utc_isoformat
 
 _POLL_INTERVAL = 60
-_SCAN_URL = "http://127.0.0.1:8010/api/directory/scan_all/stream"
+_INTERNAL_API_URL = os.getenv("INTERNAL_API_URL", "http://127.0.0.1:8010").rstrip("/")
+_SCAN_URL = f"{_INTERNAL_API_URL}/api/directory/scan_all/stream"
 
 
 def _parse_utc_timestamp(value: str) -> datetime:

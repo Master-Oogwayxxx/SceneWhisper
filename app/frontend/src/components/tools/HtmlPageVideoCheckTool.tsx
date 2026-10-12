@@ -279,25 +279,34 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
       return
     }
 
-    const linksByVideoCode = selectedVideoCodes.map((videoCode) => ({
-      videoCode,
-      links: selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, videoCode)),
-    }))
-    let openedCount = 0
-
-    for (const { links } of linksByVideoCode) {
-      for (const link of links) {
-        const tab = window.open(link, '_blank', 'noopener,noreferrer')
-        if (tab) {
-          openedCount += 1
-        }
+    const links = selectedVideoCodes.flatMap((videoCode) => (
+      selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, videoCode))
+    ))
+    const openedTabs = links.map(() => {
+      const tab = window.open('about:blank', '_blank')
+      if (!tab) {
+        return null
       }
-    }
+
+      try {
+        tab.opener = null
+      } catch {
+        // Some browsers block reassignment; opening still works without it.
+      }
+
+      return tab
+    })
+
+    openedTabs.forEach((tab, index) => {
+      if (tab) {
+        tab.location.href = links[index]
+      }
+    })
     setOpenedVideoCodes((previous) => new Set([...previous, ...selectedVideoCodes]))
     unselectVideoCodes(selectedVideoCodes)
-    const linkCount = linksByVideoCode.reduce((total, item) => total + item.links.length, 0)
-    if (openedCount < linkCount) {
-      toast.error(`Opened ${openedCount} of ${linkCount} selected site link${linkCount === 1 ? '' : 's'}`)
+    const openedCount = openedTabs.filter((tab) => tab !== null).length
+    if (openedCount < links.length) {
+      toast.error(`Opened ${openedCount} of ${links.length} selected site link${links.length === 1 ? '' : 's'}`)
     }
   }
 

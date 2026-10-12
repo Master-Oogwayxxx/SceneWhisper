@@ -860,6 +860,7 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
             {file && (
               <div className={`${isFullscreen ? 'w-3/5' : 'w-full max-w-2xl mx-auto'} shrink-0 bg-black rounded-md overflow-hidden aspect-video relative ${isFullscreen ? 'flex items-center self-center' : 'self-start'}`}>
                 <MediaPlayer
+                  key={`${file.id}-${isOpen ? 'open' : 'closed'}`}
                   ref={playerRef}
                   src={videoSource}
                   className="w-full h-full"

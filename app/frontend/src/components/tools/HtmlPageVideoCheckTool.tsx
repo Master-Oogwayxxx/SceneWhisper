@@ -29,6 +29,8 @@ interface HtmlPageVideoCheckToolProps {
 
 type VideoContentKind = 'censored' | 'uncensored'
 
+const EXTERNAL_LINK_DELAY_MS = 100
+
 export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) {
   const { settings } = useSettings()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -45,6 +47,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
   const [pastedHtml, setPastedHtml] = useState('')
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set())
   const [selectedExternalTargetKeys, setSelectedExternalTargetKeys] = useState<Set<string>>(() => new Set())
+  const [includeOriginalUrl, setIncludeOriginalUrl] = useState(false)
   const [openedVideoCodes, setOpenedVideoCodes] = useState<Set<string>>(() => new Set())
 
   useEffect(() => {
@@ -274,14 +277,17 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
     })
   }
 
-  const openSelectedExternalTargets = () => {
-    if (selectedVideoCodes.length === 0 || selectedExternalTargets.length === 0) {
+  const openSelectedExternalTargets = async () => {
+    if (selectedVideoCodes.length === 0 || (selectedExternalTargets.length === 0 && !includeOriginalUrl)) {
       return
     }
 
-    const links = selectedVideoCodes.flatMap((videoCode) => (
-      selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, videoCode))
-    ))
+    const links = [
+      ...selectedVideoCodes.flatMap((videoCode) => (
+        selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, videoCode))
+      )),
+      ...(includeOriginalUrl ? selectedItems.map((item) => item.url) : []),
+    ]
     const openedTabs = links.map(() => {
       const tab = window.open('about:blank', '_blank')
       if (!tab) {
@@ -297,11 +303,16 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
       return tab
     })
 
-    openedTabs.forEach((tab, index) => {
+    for (let index = 0; index < openedTabs.length; index += 1) {
+      const tab = openedTabs[index]
       if (tab) {
         tab.location.href = links[index]
       }
-    })
+
+      if (index < openedTabs.length - 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, EXTERNAL_LINK_DELAY_MS))
+      }
+    }
     setOpenedVideoCodes((previous) => new Set([...previous, ...selectedVideoCodes]))
     unselectVideoCodes(selectedVideoCodes)
     const openedCount = openedTabs.filter((tab) => tab !== null).length
@@ -442,7 +453,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
               </Button>
             ))}
           </div>
-          {externalVideoTargets.length > 0 ? (
+          {externalVideoTargets.length > 0 || selectedItems.some((item) => item.url) ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button type="button" size="sm" className="h-8 gap-2">
@@ -452,6 +463,15 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-52">
                 <DropdownMenuLabel>Select sites</DropdownMenuLabel>
+                {selectedItems.some((item) => item.url) ? (
+                  <DropdownMenuCheckboxItem
+                    checked={includeOriginalUrl}
+                    onCheckedChange={(checked) => setIncludeOriginalUrl(checked === true)}
+                    onSelect={(event) => event.preventDefault()}
+                  >
+                    Original URL
+                  </DropdownMenuCheckboxItem>
+                ) : null}
                 {externalVideoTargets.map((target) => (
                   <DropdownMenuCheckboxItem
                     key={target.label + target.url_template}
@@ -469,7 +489,10 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
                     size="sm"
                     variant="secondary"
                     className="h-8 flex-1 text-xs"
-                    onClick={() => setSelectedExternalTargetKeys(new Set(externalVideoTargets.map((target) => target.label + target.url_template)))}
+                    onClick={() => {
+                      setIncludeOriginalUrl(true)
+                      setSelectedExternalTargetKeys(new Set(externalVideoTargets.map((target) => target.label + target.url_template)))
+                    }}
                   >
                     Select all
                   </Button>
@@ -478,7 +501,10 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
                     size="sm"
                     variant="secondary"
                     className="h-8 flex-1 text-xs"
-                    onClick={() => setSelectedExternalTargetKeys(new Set())}
+                    onClick={() => {
+                      setIncludeOriginalUrl(false)
+                      setSelectedExternalTargetKeys(new Set())
+                    }}
                   >
                     Clear
                   </Button>
@@ -488,10 +514,12 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
                     type="button"
                     size="sm"
                     className="h-8 w-full text-xs"
-                    disabled={selectedExternalTargets.length === 0}
+                    disabled={selectedExternalTargets.length === 0 && !includeOriginalUrl}
                     onClick={openSelectedExternalTargets}
                   >
-                    Open in {selectedExternalTargets.length} selected {selectedExternalTargets.length === 1 ? 'site' : 'sites'}
+                    {includeOriginalUrl && selectedExternalTargets.length === 0
+                      ? 'Open original URL'
+                      : `Open in ${selectedExternalTargets.length} selected ${selectedExternalTargets.length === 1 ? 'site' : 'sites'}${includeOriginalUrl ? ' + original URL' : ''}`}
                   </Button>
                 </div>
               </DropdownMenuContent>

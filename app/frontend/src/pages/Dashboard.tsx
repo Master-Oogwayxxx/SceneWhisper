@@ -909,6 +909,7 @@ export const Dashboard = ({ tab, setTab, statsMinimized, highlightedTaskId, high
           initialSceneDetector={rerunSourceTask.scene_detector}
           dialogTitle="Rerun"
           submitLabel="Rerun Task"
+          isRerun
         />
       )}
     </div>

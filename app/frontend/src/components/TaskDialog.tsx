@@ -118,6 +118,8 @@ interface TaskDialogProps {
   initialSceneDetector?: string;
   dialogTitle?: string;
   submitLabel?: string;
+  /** Reruns are explicitly allowed to recreate work from a failed task. */
+  isRerun?: boolean;
 }
 
 const languages = [
@@ -239,7 +241,7 @@ function DirectoryTreeNode({
   );
 }
 
-export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, selectedFiles = [], tasks = [], onCreateTask, onTaskCreated, directoryTree, initialTaskType, initialLanguage, initialOverwriteScenes, initialOverwriteSplit, initialOverwriteSubtitles, initialDeleteVideoAfterCompletion, initialNvencOverwriteOriginal, initialSceneDetector, dialogTitle, submitLabel }: TaskDialogProps) {
+export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, selectedFiles = [], tasks = [], onCreateTask, onTaskCreated, directoryTree, initialTaskType, initialLanguage, initialOverwriteScenes, initialOverwriteSplit, initialOverwriteSubtitles, initialDeleteVideoAfterCompletion, initialNvencOverwriteOriginal, initialSceneDetector, dialogTitle, submitLabel, isRerun = false }: TaskDialogProps) {
   const { settings } = useSettings();
   const mergeMutation = useMergeTask();
   const [taskType, setTaskType] = useState<TaskDialogTaskType | null>(initialTaskType ?? null);
@@ -430,6 +432,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
    * For "all", either split or subtitle work blocking counts.
    */
   const createBlockedByExistingWork =
+    !isRerun &&
     localFiles.length > 0 &&
     tasks.length > 0 &&
     (taskType === 'scene'

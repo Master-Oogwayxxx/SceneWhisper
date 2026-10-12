@@ -55,7 +55,10 @@ const DialogContent = React.forwardRef<
         dialogVariants({ variant }),
         className,
       )}
-      onOpenAutoFocus={(e) => e.preventDefault()}
+      // Some dialogs are self-explanatory and intentionally do not render a
+      // DialogDescription. Explicitly opt those dialogs out of Radix's
+      // description warning while allowing callers to provide a description.
+      aria-describedby={undefined}
       {...props}
     >
       {children}

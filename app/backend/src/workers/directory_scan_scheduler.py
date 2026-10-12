@@ -96,6 +96,11 @@ async def run_due_directory_scan() -> bool:
 
 
 async def directory_scan_scheduler() -> None:
+    # The scheduler is started from FastAPI's lifespan before Uvicorn begins
+    # accepting requests.  Give the server a moment to become reachable before
+    # attempting an overdue scan through the internal HTTP endpoint.
+    await asyncio.sleep(5)
+
     while True:
         try:
             await run_due_directory_scan()

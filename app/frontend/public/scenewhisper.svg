@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>SceneWhisper</title>
+  <defs>
+    <linearGradient id="background" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="waveform" x1="20" y1="18" x2="46" y2="46" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#background)"/>
+  <circle cx="32" cy="32" r="21" fill="none" stroke="#cbd5e1" stroke-width="4"/>
+  <circle cx="32" cy="32" r="5" fill="#cbd5e1"/>
+  <path d="M32 11v10M32 43v10M11 32h10M43 32h10M17.2 17.2l7.1 7.1M39.7 39.7l7.1 7.1M46.8 17.2l-7.1 7.1M24.3 39.7l-7.1 7.1" stroke="#cbd5e1" stroke-width="4" stroke-linecap="round"/>
+  <path d="M25 35v-6M32 41V23M39 35v-9" fill="none" stroke="url(#waveform)" stroke-width="4" stroke-linecap="round"/>
+</svg>

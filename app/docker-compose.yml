@@ -10,6 +10,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8010:8010"
+    runtime: nvidia
     volumes:
       - /mnt/user/videos:/videos
       - /mnt/user/appdata/docker-compose-projects/SceneWhisper/data:/data

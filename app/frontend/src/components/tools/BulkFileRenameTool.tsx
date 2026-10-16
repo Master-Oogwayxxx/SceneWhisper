@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FilePenLine, Loader2 } from 'lucide-react'
+import { ArrowLeft, FilePenLine } from 'lucide-react'
 import { fileApi } from '@/api/files'
 import { toolsApi, type BulkRenameItem, type BulkRenameOptions } from '@/api/tools'
 import { formatBytes, formatDate } from './toolUtils'
@@ -12,7 +12,6 @@ const renameChecks = [
   ['remove_resolution', 'Remove resolution text'],
   ['remove_miscellaneous', 'Remove miscellaneous characters'],
   ['remove_non_english', 'Remove non-English characters'],
-  ['remove_release_tags', 'Remove release tags'],
   ['normalize_separators', 'Normalize separators'],
   ['remove_website', 'Remove website from file name'],
   ['remove_dates', 'Remove dates from file name'],
@@ -24,6 +23,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   const [directories, setDirectories] = useState<DirectoryRecord[]>([])
   const [directoryIds, setDirectoryIds] = useState<string[]>([])
   const [items, setItems] = useState<BulkRenameItem[]>([])
+  const [lastAppliedItems, setLastAppliedItems] = useState<BulkRenameItem[] | null>(null)
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([])
   const [lastSelectedFileId, setLastSelectedFileId] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -31,6 +31,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   const [directoryDialogOpen, setDirectoryDialogOpen] = useState(true)
   const [allDirectories, setAllDirectories] = useState(true)
   const [renameItem, setRenameItem] = useState<BulkRenameItem | null>(null)
+  const [applyConfirmOpen, setApplyConfirmOpen] = useState(false)
   const [renameValue, setRenameValue] = useState('')
   const [options, setOptions] = useState<BulkRenameOptions>({
     directory_ids: [],
@@ -44,6 +45,8 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     remove_dates: false,
     find_text: '',
     replace_text: '',
+    remove_first_n: 0,
+    remove_last_n: 0,
     hide_split_videos: true,
   })
 
@@ -80,15 +83,15 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     } else setSelectedFileIds((current) => (current.includes(fileId) ? current.filter((id) => id !== fileId) : [...current, fileId]))
     setLastSelectedFileId(fileId)
   }
-  const preview = async (optionsOverride?: BulkRenameOptions) => {
-    const previousSelection = new Set(selectedFileIds)
+  const preview = async (optionsOverride?: BulkRenameOptions, selectionOverride?: string[]) => {
+    const previousSelection = new Set(selectionOverride ?? selectedFileIds)
     setBusy(true)
     setMessage('')
     try {
       const next = { ...(optionsOverride ?? options), directory_ids: allDirectories ? [] : directoryIds }
       if (optionsOverride) setOptions(next)
       const nextItems = await toolsApi.previewBulkRename(next)
-      setItems(nextItems.map((item) => (previousSelection.has(item.fileId) ? item : { ...item, newName: item.originalName })))
+      setItems(nextItems)
       setSelectedFileIds(nextItems.filter((item) => previousSelection.has(item.fileId)).map((item) => item.fileId))
       setLastSelectedFileId(null)
     } catch {
@@ -129,12 +132,13 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   }, [options, allDirectories, directoryIds, directoryDialogOpen])
   const apply = async () => {
     const selected = items.filter((item) => selectedFileIds.includes(item.fileId))
-    if (!selected.length || !confirm(`Rename ${selected.filter((item) => item.originalName !== item.newName).length} files?`)) return
+    if (!selected.length) return
     setBusy(true)
     try {
       const result = await toolsApi.applyBulkRename({ ...options, directory_ids: allDirectories ? [] : directoryIds, file_ids: selectedFileIds })
       const byId = new Map(result.map((item) => [item.fileId, item]))
       setItems((current) => current.map((item) => byId.get(item.fileId) ?? item))
+      setLastAppliedItems(result.filter((item) => item.status === 'renamed'))
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['files'] }),
         queryClient.invalidateQueries({ queryKey: ['files-grouped'] }),
@@ -149,9 +153,41 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
       setBusy(false)
     }
   }
+  const selectedRenameCount = items.filter((item) => selectedFileIds.includes(item.fileId) && item.originalName !== item.newName).length
+  const undo = async () => {
+    if (!lastAppliedItems?.length) return
+    setBusy(true)
+    try {
+      const result = await toolsApi.undoBulkRename(lastAppliedItems)
+      const byId = new Map(result.map((item) => [item.fileId, item]))
+      setItems((current) => current.map((item) => byId.get(item.fileId) ?? item))
+      setLastAppliedItems(null)
+      setMessage('Undo complete')
+    } catch {
+      setMessage('Undo failed')
+    } finally {
+      setBusy(false)
+    }
+  }
   const confirmDirectories = async () => {
     setDirectoryDialogOpen(false)
   }
+  const resetOptions = () => setOptions({
+    directory_ids: [],
+    remove_miscellaneous: false,
+    remove_non_english: false,
+    remove_resolution: false,
+    extract_video_code: false,
+    normalize_separators: false,
+    remove_release_tags: false,
+    remove_website: false,
+    remove_dates: false,
+    find_text: '',
+    replace_text: '',
+    remove_first_n: 0,
+    remove_last_n: 0,
+    hide_split_videos: true,
+  })
 
   return (
     <div className='accent-primary flex h-full min-h-0 flex-col overflow-hidden bg-background shadow sm:rounded-lg'>
@@ -165,8 +201,8 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
           <p className='text-xs text-muted-foreground'>Preview safe filename cleanup before applying it.</p>
         </div>
       </div>
-      <div className='min-h-0 flex-1 overflow-hidden grid grid-cols-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start'>
-        <div className='lg:col-start-2 lg:row-start-1 rounded-md border border-border p-3'>
+      <div className='grid h-full min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden p-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[minmax(0,1fr)] lg:items-start'>
+        <div className='flex h-full min-h-0 flex-col overflow-y-auto rounded-md border border-border p-3 scrollbar lg:col-start-2 lg:row-start-1'>
           <div className='flex items-center justify-between'>
             <div>
               <p className='text-sm font-medium'>Rename options</p>
@@ -195,6 +231,16 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
                 className='w-full rounded border border-input bg-background px-2 py-1.5'
               />
             </label>
+            <div className='border-t-2 border-border' />
+            <label className='text-sm'>
+              <span className='mb-1 block font-medium'>Remove first N characters</span>
+              <input type='number' min='0' value={options.remove_first_n} onChange={(event) => setOptions((current) => ({ ...current, remove_first_n: Math.max(0, Number(event.target.value) || 0) }))} className='w-full rounded border border-input bg-background px-2 py-1.5' />
+            </label>
+            <label className='text-sm'>
+              <span className='mb-1 block font-medium'>Remove last N characters</span>
+              <input type='number' min='0' value={options.remove_last_n} onChange={(event) => setOptions((current) => ({ ...current, remove_last_n: Math.max(0, Number(event.target.value) || 0) }))} className='w-full rounded border border-input bg-background px-2 py-1.5' />
+            </label>
+            <div className='border-t-2 border-border' />
             {renameChecks.map(([key, label]) => (
               <label key={key} className='flex items-center gap-2 text-sm'>
                 <input
@@ -206,42 +252,48 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
               </label>
             ))}
           </div>
-          <div className='mt-3 flex flex-wrap gap-2'>
-            <button type='button' onClick={() => void preview()} disabled={busy || directoryDialogOpen} className='rounded bg-primary px-3 py-2 text-sm text-primary-foreground'>
-              {busy ? <Loader2 className='h-4 w-4 animate-spin' /> : 'Refresh preview'}
+          <div className='mt-auto flex flex-col gap-2 pt-3'>
+            <button type='button' onClick={resetOptions} disabled={busy} className='rounded border border-border px-3 py-2 text-sm'>
+              Reset
+            </button>
+            <button type='button' onClick={() => void undo()} disabled={busy || !lastAppliedItems?.length} className='rounded border border-border bg-secondary px-3 py-2 text-sm hover:bg-secondary/80 disabled:opacity-50'>
+              Undo
             </button>
             <button
               type='button'
-              onClick={apply}
+              onClick={() => setApplyConfirmOpen(true)}
               disabled={busy || !selectedFileIds.some((id) => items.some((item) => item.fileId === id && item.originalName !== item.newName))}
-              className='rounded border border-border px-3 py-2 text-sm'
+              className='rounded bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
             >
-              Apply rename
+              Apply
             </button>
           </div>
         </div>
-        <div className='min-h-0 overflow-auto lg:col-start-1 lg:row-start-1 rounded-md border border-border'>
-          <table className='w-full table-fixed text-left text-sm'>
-            <thead className='sticky top-0 z-10 border-b border-border bg-muted/40'>
+        <div className='min-h-0 min-w-0 self-stretch overflow-x-auto overflow-y-auto rounded-md border border-border scrollbar lg:col-start-1 lg:row-start-1'>
+          <table className='w-full min-w-[64rem] table-fixed text-left text-sm'>
+            <thead className='[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:overflow-hidden [&_th]:bg-background [&_th]:shadow-[inset_0_-2px_0_hsl(var(--border))]'>
               <tr>
-                <th className='w-10 p-3'>
+                <th className='w-[5%] p-3'>
                   <input
                     type='checkbox'
                     aria-label='Select all files'
                     checked={items.length > 0 && selectedFileIds.length === items.length}
                     onChange={(event) => {
-                      setSelectedFileIds(event.target.checked ? items.map((item) => item.fileId) : [])
+                      const nextSelection = event.target.checked ? items.map((item) => item.fileId) : []
+                      setSelectedFileIds(nextSelection)
                       setLastSelectedFileId(null)
+                      if (event.target.checked) void preview(undefined, nextSelection)
+                      else setItems((current) => current.map((item) => ({ ...item, newName: item.originalName })))
                     }}
                   />
                 </th>
-                <th className='w-2/5 p-3 font-semibold'>Original file name</th>
-                <th className='w-2/5 p-3 font-semibold'>Preview name</th>
-                <th className='w-32 p-3 font-semibold'>Created</th>
-                <th className='w-24 p-3 font-semibold'>Size</th>
+                <th className='w-[35%] p-3 font-semibold'>Original file name</th>
+                <th className='w-[35%] p-3 font-semibold'>Preview name</th>
+                <th className='w-[15%] p-3 font-semibold'>Created</th>
+                <th className='w-[10%] p-3 font-semibold'>Size</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className='[&_td]:overflow-hidden'>
               {items.map((item) => (
                 <tr key={item.fileId} onContextMenu={(event) => { event.preventDefault(); setRenameItem(item); setRenameValue(item.originalName.replace(/\.[^.]+$/, '')) }} className='border-b border-border last:border-0'>
                   <td className='p-3 align-top'>
@@ -249,15 +301,21 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
                       type='checkbox'
                       aria-label={`Select ${item.originalName}`}
                       checked={selectedFileIds.includes(item.fileId)}
-                      onChange={(event) => selectFile(item.fileId, event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey)}
+                      onChange={(event) => {
+                        const shiftKey = event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey
+                        selectFile(item.fileId, shiftKey)
+                        if (!event.target.checked) {
+                          setItems((current) => current.map((currentItem) => currentItem.fileId === item.fileId ? { ...currentItem, newName: currentItem.originalName } : currentItem))
+                        }
+                      }}
                     />
                   </td>
                   <td className='break-all p-3 align-top'>{item.originalName}</td>
                   <td className={item.originalName === item.newName ? 'break-all p-3 align-top text-muted-foreground' : 'break-all p-3 align-top font-medium text-primary'}>
                     {item.newName}
                   </td>
-                  <td className='whitespace-nowrap p-3 align-top text-muted-foreground'>{formatDate(item.createdAt)}</td>
-                  <td className='whitespace-nowrap p-3 align-top text-muted-foreground'>{formatBytes(item.size)}</td>
+                  <td className='break-words p-3 align-top text-muted-foreground'>{formatDate(item.createdAt)}</td>
+                  <td className='break-words p-3 align-top text-muted-foreground'>{formatBytes(item.size)}</td>
                 </tr>
               ))}
               {!items.length && (
@@ -285,29 +343,30 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <Dialog open={applyConfirmOpen} onOpenChange={setApplyConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Apply rename?</DialogTitle>
+            <DialogDescription>Rename {selectedRenameCount} selected {selectedRenameCount === 1 ? 'file' : 'files'} using the current preview?</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button type='button' onClick={() => setApplyConfirmOpen(false)} className='rounded border border-border px-3 py-2 text-sm'>Cancel</button>
+            <button type='button' onClick={() => { setApplyConfirmOpen(false); void apply() }} className='rounded bg-primary px-3 py-2 text-sm text-primary-foreground'>Apply</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={directoryDialogOpen} onOpenChange={setDirectoryDialogOpen}>
-        <DialogContent className='max-w-xl'>
+        <DialogContent className='h-[95vh] max-h-[95vh] max-w-xl grid-rows-[auto_minmax(0,1fr)_auto]'>
           <DialogHeader>
             <DialogTitle>Select directories to rename</DialogTitle>
             <DialogDescription>Choose the directories whose indexed files should be included in the rename preview.</DialogDescription>
           </DialogHeader>
-          <div className='max-h-80 space-y-2 overflow-y-auto rounded-md border border-border p-3 scrollbar'>
-            <label className='flex cursor-pointer items-center gap-2 rounded p-2 hover:bg-secondary/40'>
-              <input
-                type='checkbox'
-                checked={allDirectories}
-                onChange={(event) => {
-                  setAllDirectories(event.target.checked)
-                  if (event.target.checked) setDirectoryIds([])
-                }}
-              />
-              All directories
-            </label>
+          <div className='min-h-0 space-y-1 overflow-y-auto rounded-md border border-border p-2 scrollbar'>
             {directories.map((directory) => (
-              <label key={directory.id} className='flex cursor-pointer items-center gap-2 rounded p-2 hover:bg-secondary/40'>
+              <label key={directory.id} className='flex cursor-pointer items-center gap-2 rounded p-1.5 hover:bg-secondary/40'>
                 <input
                   type='checkbox'
-                  checked={!allDirectories && directoryIds.includes(directory.id)}
+                  checked={allDirectories || directoryIds.includes(directory.id)}
                   onChange={() => toggleDirectory(directory.id)}
                 />
                 {directory.name}
@@ -315,6 +374,29 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
             ))}
           </div>
           <DialogFooter>
+            <div className='mr-auto flex gap-2'>
+              <button
+                type='button'
+                onClick={() => {
+                  setAllDirectories(true)
+                  setDirectoryIds([])
+                }}
+                className='rounded border border-border px-3 py-2 text-sm'
+              >
+                Select all
+              </button>
+              <button
+                type='button'
+                onClick={() => {
+                  setAllDirectories(false)
+                  setDirectoryIds([])
+                setItems((current) => current.map((item) => ({ ...item, newName: item.originalName })))
+                }}
+                className='rounded border border-border px-3 py-2 text-sm'
+              >
+                Deselect all
+              </button>
+            </div>
             <button type='button' onClick={onBack} className='rounded border border-border px-3 py-2 text-sm'>
               Cancel
             </button>

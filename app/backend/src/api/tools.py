@@ -147,6 +147,8 @@ class BulkRenameOptions(BaseModel):
     remove_dates: bool = False
     find_text: str = ""
     replace_text: str = ""
+    remove_first_n: int = 0
+    remove_last_n: int = 0
     hide_split_videos: bool = False
 
 
@@ -154,21 +156,51 @@ class BulkRenameApplyRequest(BulkRenameOptions):
     file_ids: list[str]
 
 
+class BulkRenameUndoItem(BaseModel):
+    file_id: str
+    original_name: str
+    new_name: str
+
+
+class BulkRenameUndoRequest(BaseModel):
+    items: list[BulkRenameUndoItem]
+
+
 def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
     stem, extension = os.path.splitext(name)
+    if options.remove_first_n or options.remove_last_n:
+        start = max(0, options.remove_first_n)
+        end = len(stem) - max(0, options.remove_last_n) if options.remove_last_n else len(stem)
+        stem = stem[start:end] if end > start else ""
     if options.find_text:
         stem = stem.replace(options.find_text, options.replace_text)
+    if options.remove_dates:
+        stem = re.sub(
+            r"(?<![A-Za-z0-9])(?:"
+            r"(?:19|20)\d{2}[-_. ]?(?:0[1-9]|1[0-2])[-_. ]?(?:0[1-9]|[12]\d|3[01])"
+            r"|(?:0[1-9]|[12]\d|3[01])[-_. ]?(?:0[1-9]|1[0-2])[-_. ]?(?:19|20)\d{2}"
+            r"|(?:0[1-9]|[12]\d|3[01])[-_. ]?(?:0[1-9]|1[0-2])[-_. ]?\d{2}"
+            r")(?![A-Za-z0-9])",
+            "",
+            stem,
+        )
+    if options.remove_resolution:
+        stem = re.sub(
+            r"(?<![A-Za-z0-9])(?:2160p|1440p|1080p|720p|480p|4k|8k)(?![A-Za-z0-9])",
+            "",
+            stem,
+            flags=re.IGNORECASE,
+        )
     code_match = re.search(r"\b([A-Za-z]{2,8})[-_ ]?(\d{2,5})\b", stem, re.IGNORECASE)
     code = f"{code_match.group(1).upper()}-{code_match.group(2)}" if code_match else ""
+    suffix_match = re.search(r"(?:^|[-_ ])(RM|SUB|UC)\b", stem, re.IGNORECASE)
+    if code and suffix_match:
+        code = f"{code}-{suffix_match.group(1).upper()}"
     if options.extract_video_code and code:
         stem = code
     else:
-        if options.remove_dates:
-            stem = re.sub(r"\b(?:19|20)\d{2}[-_. ]?(?:0[1-9]|1[0-2])[-_. ]?(?:0[1-9]|[12]\d|3[01])\b", "", stem)
         if options.remove_website:
             stem = re.sub(r"\b(?:https?://)?(?:www\.)?[a-z0-9-]+\.(?:com|net|org|tv|to|me|co|jp|uk|de|info|xyz)\b", "", stem, flags=re.IGNORECASE)
-        if options.remove_resolution:
-            stem = re.sub(r"\b(?:2160p|1440p|1080p|720p|480p|4k|8k)\b", "", stem, flags=re.IGNORECASE)
         if options.remove_release_tags:
             stem = re.sub(r"\b(?:字幕|中字|uncensored|censored|む|h264|h265|hevc|x264|x265|webrip|bluray|proper|repack)\b", "", stem, flags=re.IGNORECASE)
         if options.remove_miscellaneous:
@@ -180,6 +212,7 @@ def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
         stem = re.sub(r"_+", "-", stem)
         stem = re.sub(r"\.+", " ", stem)
         stem = re.sub(r"\s+", " ", stem).strip(" .-_")
+        stem = re.sub(r"\s*-\s*", "-", stem)
     if not stem:
         return name
     return f"{stem}{extension}"
@@ -233,6 +266,34 @@ async def apply_bulk_rename(body: BulkRenameApplyRequest):
             row.name = candidate
             row.path = new_path
             results.append({"file_id": row.id, "status": "renamed", "original_name": os.path.basename(old_path), "new_name": candidate, "created_at": row.created_at, "size": row.size})
+        db.commit()
+        return {"items": results}
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        close_db(db)
+
+
+@router.post("/bulk-rename/undo")
+async def undo_bulk_rename(body: BulkRenameUndoRequest):
+    db = get_db()
+    try:
+        rows = {row.id: row for row in db.query(FileRecord).filter(FileRecord.id.in_([item.file_id for item in body.items])).all()}
+        results = []
+        for item in body.items:
+            row = rows.get(item.file_id)
+            if not row or row.name != item.new_name:
+                continue
+            old_path = row.path
+            new_path = os.path.join(os.path.dirname(old_path), item.original_name)
+            if os.path.exists(new_path):
+                raise HTTPException(status_code=409, detail=f"Target already exists: {item.original_name}")
+            if os.path.exists(old_path):
+                os.rename(old_path, new_path)
+            row.name = item.original_name
+            row.path = new_path
+            results.append({"file_id": row.id, "status": "renamed", "original_name": item.new_name, "new_name": item.original_name, "created_at": row.created_at, "size": row.size})
         db.commit()
         return {"items": results}
     except Exception:

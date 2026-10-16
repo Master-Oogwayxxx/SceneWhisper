@@ -17,7 +17,7 @@ _POLL_INTERVAL = 60
 _STARTUP_DELAY = 15
 _REQUEST_RETRIES = 5
 _REQUEST_RETRY_DELAY = 2
-_INTERNAL_API_URL = os.getenv("INTERNAL_API_URL", "http://127.0.0.1:8010").rstrip("/")
+_INTERNAL_API_URL = os.getenv("INTERNAL_API_URL", "http://127.0.0.1:8011").rstrip("/")
 _SCAN_URL = f"{_INTERNAL_API_URL}/api/directory/scan_all/stream"
 
 

@@ -138,6 +138,7 @@ class DeleteSubtitleHealthFilesResponse(BaseModel):
 class BulkRenameOptions(BaseModel):
     directory_ids: list[str] = []
     remove_miscellaneous: bool = True
+    remove_non_english: bool = False
     remove_resolution: bool = True
     extract_video_code: bool = True
     normalize_separators: bool = True
@@ -173,10 +174,15 @@ def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
         if options.remove_miscellaneous:
             stem = re.sub(r"[\[\]{}()]+", " ", stem)
             stem = re.sub(r"[^\w\- .]", " ", stem, flags=re.UNICODE)
+        if options.remove_non_english:
+            stem = re.sub(r"[^\x00-\x7F]", " ", stem)
     if options.normalize_separators:
-        stem = re.sub(r"[._]+", " ", stem)
+        stem = re.sub(r"_+", "-", stem)
+        stem = re.sub(r"\.+", " ", stem)
         stem = re.sub(r"\s+", " ", stem).strip(" .-_")
-    return f"{stem or 'renamed-file'}{extension}"
+    if not stem:
+        return name
+    return f"{stem}{extension}"
 
 
 def _bulk_rename_rows(db, options: BulkRenameOptions, file_ids: list[str] | None = None):
@@ -196,7 +202,7 @@ async def preview_bulk_rename(body: BulkRenameOptions):
     db = get_db()
     try:
         rows = _bulk_rename_rows(db, body)
-        return {"items": [{"file_id": row.id, "original_name": row.name, "new_name": _bulk_rename_name(row.name, body), "path": row.path} for row in rows]}
+        return {"items": [{"file_id": row.id, "original_name": row.name, "new_name": _bulk_rename_name(row.name, body), "path": row.path, "created_at": row.created_at, "size": row.size} for row in rows]}
     finally:
         close_db(db)
 
@@ -218,7 +224,7 @@ async def apply_bulk_rename(body: BulkRenameApplyRequest):
                 index += 1
             used.add(candidate)
             if candidate == row.name:
-                results.append({"file_id": row.id, "status": "unchanged", "original_name": row.name, "new_name": candidate})
+                results.append({"file_id": row.id, "status": "unchanged", "original_name": row.name, "new_name": candidate, "created_at": row.created_at, "size": row.size})
                 continue
             old_path = row.path
             new_path = os.path.join(os.path.dirname(old_path), candidate)
@@ -226,7 +232,7 @@ async def apply_bulk_rename(body: BulkRenameApplyRequest):
                 os.rename(old_path, new_path)
             row.name = candidate
             row.path = new_path
-            results.append({"file_id": row.id, "status": "renamed", "original_name": os.path.basename(old_path), "new_name": candidate})
+            results.append({"file_id": row.id, "status": "renamed", "original_name": os.path.basename(old_path), "new_name": candidate, "created_at": row.created_at, "size": row.size})
         db.commit()
         return {"items": results}
     except Exception:

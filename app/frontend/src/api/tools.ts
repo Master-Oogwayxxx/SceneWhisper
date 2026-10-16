@@ -151,11 +151,11 @@ export const toolsApi = {
   },
 }
 
-interface ApiBulkRenameItem { file_id: string; original_name: string; new_name: string; path?: string; status?: string }
-function fromApiBulkRenameItem(item: ApiBulkRenameItem): BulkRenameItem { return { fileId: item.file_id, originalName: item.original_name, newName: item.new_name, path: item.path, status: item.status } }
-export interface BulkRenameOptions { directory_ids: string[]; remove_miscellaneous: boolean; remove_resolution: boolean; extract_video_code: boolean; normalize_separators: boolean; remove_release_tags: boolean; remove_website: boolean; remove_dates: boolean; find_text: string; replace_text: string; hide_split_videos: boolean }
+interface ApiBulkRenameItem { file_id: string; original_name: string; new_name: string; path?: string; status?: string; created_at?: string | null; size?: number | null }
+function fromApiBulkRenameItem(item: ApiBulkRenameItem): BulkRenameItem { return { fileId: item.file_id, originalName: item.original_name, newName: item.new_name, path: item.path, status: item.status, createdAt: item.created_at, size: item.size } }
+export interface BulkRenameOptions { directory_ids: string[]; remove_miscellaneous: boolean; remove_non_english: boolean; remove_resolution: boolean; extract_video_code: boolean; normalize_separators: boolean; remove_release_tags: boolean; remove_website: boolean; remove_dates: boolean; find_text: string; replace_text: string; hide_split_videos: boolean }
 export interface BulkRenameApplyOptions extends BulkRenameOptions { file_ids: string[] }
-export interface BulkRenameItem { fileId: string; originalName: string; newName: string; path?: string; status?: string }
+export interface BulkRenameItem { fileId: string; originalName: string; newName: string; path?: string; status?: string; createdAt?: string | null; size?: number | null }
 
 interface ApiSubtitleHealthItem {
   file: File

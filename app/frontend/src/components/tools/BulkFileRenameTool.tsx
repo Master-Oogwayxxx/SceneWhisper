@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, FilePenLine, Loader2 } from 'lucide-react'
 import { fileApi } from '@/api/files'
 import { toolsApi, type BulkRenameItem, type BulkRenameOptions } from '@/api/tools'
+import { formatBytes, formatDate } from './toolUtils'
 import type { DirectoryRecord } from '@/types/types'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
@@ -9,6 +11,7 @@ const renameChecks = [
   ['extract_video_code', 'Extract video code'],
   ['remove_resolution', 'Remove resolution text'],
   ['remove_miscellaneous', 'Remove miscellaneous characters'],
+  ['remove_non_english', 'Remove non-English characters'],
   ['remove_release_tags', 'Remove release tags'],
   ['normalize_separators', 'Normalize separators'],
   ['remove_website', 'Remove website from file name'],
@@ -17,6 +20,7 @@ const renameChecks = [
 ] as const
 
 export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
+  const queryClient = useQueryClient()
   const [directories, setDirectories] = useState<DirectoryRecord[]>([])
   const [directoryIds, setDirectoryIds] = useState<string[]>([])
   const [items, setItems] = useState<BulkRenameItem[]>([])
@@ -26,9 +30,12 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   const [message, setMessage] = useState('')
   const [directoryDialogOpen, setDirectoryDialogOpen] = useState(true)
   const [allDirectories, setAllDirectories] = useState(true)
+  const [renameItem, setRenameItem] = useState<BulkRenameItem | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const [options, setOptions] = useState<BulkRenameOptions>({
     directory_ids: [],
     remove_miscellaneous: false,
+    remove_non_english: false,
     remove_resolution: false,
     extract_video_code: false,
     normalize_separators: false,
@@ -79,7 +86,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     setMessage('')
     try {
       const next = { ...(optionsOverride ?? options), directory_ids: allDirectories ? [] : directoryIds }
-      setOptions(next)
+      if (optionsOverride) setOptions(next)
       const nextItems = await toolsApi.previewBulkRename(next)
       setItems(nextItems.map((item) => (previousSelection.has(item.fileId) ? item : { ...item, newName: item.originalName })))
       setSelectedFileIds(nextItems.filter((item) => previousSelection.has(item.fileId)).map((item) => item.fileId))
@@ -92,8 +99,34 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   }
   const updateHideSplitVideos = async (value: boolean) => {
     const next = { ...options, hide_split_videos: value }
-    await preview(next)
+    setOptions(next)
   }
+  const renameFile = async () => {
+    if (!renameItem || !renameValue.trim() || renameValue === renameItem.originalName) return
+    const extension = renameItem.originalName.match(/(\.[^.]*)$/)?.[1] ?? ''
+    const newName = renameValue.trim().endsWith(extension) ? renameValue.trim() : `${renameValue.trim()}${extension}`
+    const originalStem = extension ? renameItem.originalName.slice(0, -extension.length) : renameItem.originalName
+    const newStem = extension ? newName.slice(0, -extension.length) : newName
+    setBusy(true)
+    try {
+      const [result] = await Promise.all([toolsApi.applyBulkRename({ ...options, directory_ids: [], file_ids: [renameItem.fileId], find_text: originalStem, replace_text: newStem, extract_video_code: false, remove_resolution: false, remove_miscellaneous: false, normalize_separators: false, remove_release_tags: false, remove_website: false, remove_dates: false, hide_split_videos: false }), queryClient.invalidateQueries({ queryKey: ['files'] }), queryClient.invalidateQueries({ queryKey: ['files-grouped'] }), queryClient.invalidateQueries({ queryKey: ['files-tree-folder'] })])
+      const updated = result[0]
+      if (updated) setItems((current) => current.map((item) => item.fileId === updated.fileId ? updated : item))
+      setRenameItem(null)
+      setMessage('File renamed')
+    } catch {
+      setMessage('Rename failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+  useEffect(() => {
+    if (directoryDialogOpen) return
+    const handle = window.setTimeout(() => {
+      void preview()
+    }, 300)
+    return () => window.clearTimeout(handle)
+  }, [options, allDirectories, directoryIds, directoryDialogOpen])
   const apply = async () => {
     const selected = items.filter((item) => selectedFileIds.includes(item.fileId))
     if (!selected.length || !confirm(`Rename ${selected.filter((item) => item.originalName !== item.newName).length} files?`)) return
@@ -102,6 +135,13 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
       const result = await toolsApi.applyBulkRename({ ...options, directory_ids: allDirectories ? [] : directoryIds, file_ids: selectedFileIds })
       const byId = new Map(result.map((item) => [item.fileId, item]))
       setItems((current) => current.map((item) => byId.get(item.fileId) ?? item))
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['files'] }),
+        queryClient.invalidateQueries({ queryKey: ['files-grouped'] }),
+        queryClient.invalidateQueries({ queryKey: ['files-tree-folder'] }),
+        queryClient.invalidateQueries({ queryKey: ['directories'] }),
+        queryClient.invalidateQueries({ queryKey: ['tree-directory-file-counts'] }),
+      ])
       setMessage('Rename complete')
     } catch {
       setMessage('Rename failed')
@@ -111,7 +151,6 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   }
   const confirmDirectories = async () => {
     setDirectoryDialogOpen(false)
-    await preview()
   }
 
   return (
@@ -126,7 +165,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
           <p className='text-xs text-muted-foreground'>Preview safe filename cleanup before applying it.</p>
         </div>
       </div>
-      <div className='min-h-0 flex-1 overflow-auto grid grid-cols-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start'>
+      <div className='min-h-0 flex-1 overflow-hidden grid grid-cols-1 gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start'>
         <div className='lg:col-start-2 lg:row-start-1 rounded-md border border-border p-3'>
           <div className='flex items-center justify-between'>
             <div>
@@ -181,9 +220,9 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
             </button>
           </div>
         </div>
-        <div className='lg:col-start-1 lg:row-start-1 overflow-x-auto rounded-md border border-border'>
+        <div className='min-h-0 overflow-auto lg:col-start-1 lg:row-start-1 rounded-md border border-border'>
           <table className='w-full table-fixed text-left text-sm'>
-            <thead className='border-b border-border bg-muted/40'>
+            <thead className='sticky top-0 z-10 border-b border-border bg-muted/40'>
               <tr>
                 <th className='w-10 p-3'>
                   <input
@@ -196,13 +235,15 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
                     }}
                   />
                 </th>
-                <th className='w-1/2 p-3 font-semibold'>Original file name</th>
-                <th className='w-1/2 p-3 font-semibold'>Preview name</th>
+                <th className='w-2/5 p-3 font-semibold'>Original file name</th>
+                <th className='w-2/5 p-3 font-semibold'>Preview name</th>
+                <th className='w-32 p-3 font-semibold'>Created</th>
+                <th className='w-24 p-3 font-semibold'>Size</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.fileId} className='border-b border-border last:border-0'>
+                <tr key={item.fileId} onContextMenu={(event) => { event.preventDefault(); setRenameItem(item); setRenameValue(item.originalName.replace(/\.[^.]+$/, '')) }} className='border-b border-border last:border-0'>
                   <td className='p-3 align-top'>
                     <input
                       type='checkbox'
@@ -215,11 +256,13 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
                   <td className={item.originalName === item.newName ? 'break-all p-3 align-top text-muted-foreground' : 'break-all p-3 align-top font-medium text-primary'}>
                     {item.newName}
                   </td>
+                  <td className='whitespace-nowrap p-3 align-top text-muted-foreground'>{formatDate(item.createdAt)}</td>
+                  <td className='whitespace-nowrap p-3 align-top text-muted-foreground'>{formatBytes(item.size)}</td>
                 </tr>
               ))}
               {!items.length && (
                 <tr>
-                  <td colSpan={3} className='p-6 text-center text-muted-foreground'>
+                  <td colSpan={5} className='p-6 text-center text-muted-foreground'>
                     Select directories to generate a preview.
                   </td>
                 </tr>
@@ -229,6 +272,19 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
         </div>
         {message && <p className='lg:col-start-1 lg:row-start-2 text-sm text-muted-foreground'>{message}</p>}
       </div>
+      <Dialog open={renameItem !== null} onOpenChange={(open) => { if (!open) setRenameItem(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename file</DialogTitle>
+            <DialogDescription>Enter a new filename. The original extension is preserved.</DialogDescription>
+          </DialogHeader>
+          <input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} className='w-full rounded border border-input bg-background px-3 py-2' autoFocus />
+          <DialogFooter>
+            <button type='button' onClick={() => setRenameItem(null)} className='rounded border border-border px-3 py-2 text-sm'>Cancel</button>
+            <button type='button' onClick={() => void renameFile()} disabled={busy || !renameValue.trim()} className='rounded bg-primary px-3 py-2 text-sm text-primary-foreground'>Rename</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={directoryDialogOpen} onOpenChange={setDirectoryDialogOpen}>
         <DialogContent className='max-w-xl'>
           <DialogHeader>

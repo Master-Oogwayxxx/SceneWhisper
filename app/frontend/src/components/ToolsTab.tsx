@@ -1,15 +1,22 @@
 import { useState } from 'react'
-import { Activity, FileCode2, FileSearch, Layers3, ListChecks, Subtitles } from 'lucide-react'
+import { Activity, FileCode2, FileSearch, FilePenLine, Layers3, ListChecks, Subtitles } from 'lucide-react'
 import { BookmarkVideoCheckTool } from './tools/BookmarkVideoCheckTool'
 import { DuplicateFinderTool } from './tools/DuplicateFinderTool'
 import { VideoCodeMatcherTool } from './tools/VideoCodeMatcherTool'
 import { FramePacingAnalyzerTool } from './tools/FramePacingAnalyzerTool'
 import { SubtitleHealthCheckTool } from './tools/SubtitleHealthCheckTool'
 import { HtmlPageVideoCheckTool } from './tools/HtmlPageVideoCheckTool'
+import { BulkFileRenameTool } from './tools/BulkFileRenameTool'
 
-type ActiveTool = 'bookmarks' | 'html-page-videos' | 'duplicates' | 'codes' | 'frame-pacing' | 'subtitle-health' | null
+type ActiveTool = 'bookmarks' | 'html-page-videos' | 'duplicates' | 'codes' | 'frame-pacing' | 'subtitle-health' | 'bulk-rename' | null
 
 const AVAILABLE_TOOLS = [
+  {
+    id: 'bulk-rename' as const,
+    name: 'Bulk File Rename',
+    description: 'Preview cleaned video filenames with code extraction, resolution removal, and separator normalization.',
+    Icon: FilePenLine,
+  },
   {
     id: 'frame-pacing' as const,
     name: 'Frame Pacing Analyzer',
@@ -73,6 +80,9 @@ export function ToolsTab() {
 
   if (activeTool === 'subtitle-health') {
     return <SubtitleHealthCheckTool onBack={() => setActiveTool(null)} />
+  }
+  if (activeTool === 'bulk-rename') {
+    return <BulkFileRenameTool onBack={() => setActiveTool(null)} />
   }
 
   return (

@@ -14,6 +14,9 @@ from ..crud.setting import get_settings, patch_settings
 from ..utils import calculate_next_run, utc_isoformat
 
 _POLL_INTERVAL = 60
+_STARTUP_DELAY = 15
+_REQUEST_RETRIES = 5
+_REQUEST_RETRY_DELAY = 2
 _INTERNAL_API_URL = os.getenv("INTERNAL_API_URL", "http://127.0.0.1:8010").rstrip("/")
 _SCAN_URL = f"{_INTERNAL_API_URL}/api/directory/scan_all/stream"
 
@@ -67,17 +70,32 @@ async def run_due_directory_scan() -> bool:
         next_run = utc_isoformat(calculate_next_run(schedule_payload))
         scan_url = _get_scan_url(settings)
         try:
-            with urllib.request.urlopen(scan_url, timeout=30) as response:
-                for raw_line in response:
-                    line = raw_line.decode("utf-8", errors="ignore").strip()
-                    if line.startswith("data: "):
-                        payload = line[6:]
-                        if payload:
-                            json.loads(payload)
+            last_error: Exception | None = None
+            for attempt in range(_REQUEST_RETRIES):
+                try:
+                    with urllib.request.urlopen(scan_url, timeout=30) as response:
+                        for raw_line in response:
+                            line = raw_line.decode("utf-8", errors="ignore").strip()
+                            if line.startswith("data: "):
+                                payload = line[6:]
+                                if payload:
+                                    json.loads(payload)
+                    last_error = None
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    if attempt < _REQUEST_RETRIES - 1:
+                        time.sleep(_REQUEST_RETRY_DELAY)
+            if last_error is not None:
+                raise last_error
         except Exception as exc:
             patch_settings(
                 {
-                    "scan_schedule_next_run": next_run,
+                    # Keep an operational failure retryable instead of
+                    # postponing it until the next daily schedule.
+                    "scan_schedule_next_run": utc_isoformat(
+                        datetime.now(timezone.utc).replace(microsecond=0)
+                    ),
                     "scan_schedule_last_error": str(exc),
                 }
             )
@@ -96,6 +114,9 @@ async def run_due_directory_scan() -> bool:
 
 
 async def directory_scan_scheduler() -> None:
+    # FastAPI starts lifespan tasks before Uvicorn accepts HTTP requests.
+    await asyncio.sleep(_STARTUP_DELAY)
+
     while True:
         try:
             await run_due_directory_scan()

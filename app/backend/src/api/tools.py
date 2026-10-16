@@ -1,6 +1,7 @@
 import asyncio
 import json
 import math
+import os
 import re
 import statistics
 import subprocess
@@ -131,6 +132,103 @@ class DeleteSubtitleHealthFilesResponse(BaseModel):
     deleted: int
     skipped: int
     deleted_files: list[BookmarkMatchedFile] = []
+
+
+class BulkRenameOptions(BaseModel):
+    directory_ids: list[str] = []
+    remove_miscellaneous: bool = True
+    remove_resolution: bool = True
+    extract_video_code: bool = True
+    normalize_separators: bool = True
+    remove_release_tags: bool = True
+    remove_website: bool = False
+    remove_dates: bool = False
+    find_text: str = ""
+    replace_text: str = ""
+
+
+class BulkRenameApplyRequest(BulkRenameOptions):
+    file_ids: list[str]
+
+
+def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
+    stem, extension = os.path.splitext(name)
+    if options.find_text:
+        stem = stem.replace(options.find_text, options.replace_text)
+    code_match = re.search(r"\b([A-Za-z]{2,8})[-_ ]?(\d{2,5})\b", stem, re.IGNORECASE)
+    code = f"{code_match.group(1).upper()}-{code_match.group(2)}" if code_match else ""
+    if options.extract_video_code and code:
+        stem = code
+    else:
+        if options.remove_dates:
+            stem = re.sub(r"\b(?:19|20)\d{2}[-_. ]?(?:0[1-9]|1[0-2])[-_. ]?(?:0[1-9]|[12]\d|3[01])\b", "", stem)
+        if options.remove_website:
+            stem = re.sub(r"\b(?:https?://)?(?:www\.)?[a-z0-9-]+\.(?:com|net|org|tv|to|me|co|jp|uk|de|info|xyz)\b", "", stem, flags=re.IGNORECASE)
+        if options.remove_resolution:
+            stem = re.sub(r"\b(?:2160p|1440p|1080p|720p|480p|4k|8k)\b", "", stem, flags=re.IGNORECASE)
+        if options.remove_release_tags:
+            stem = re.sub(r"\b(?:字幕|中字|uncensored|censored|む|h264|h265|hevc|x264|x265|webrip|bluray|proper|repack)\b", "", stem, flags=re.IGNORECASE)
+        if options.remove_miscellaneous:
+            stem = re.sub(r"[\[\]{}()]+", " ", stem)
+            stem = re.sub(r"[^\w\- .]", " ", stem, flags=re.UNICODE)
+    if options.normalize_separators:
+        stem = re.sub(r"[._]+", " ", stem)
+        stem = re.sub(r"\s+", " ", stem).strip(" .-_")
+    return f"{stem or 'renamed-file'}{extension}"
+
+
+def _bulk_rename_rows(db, options: BulkRenameOptions, file_ids: list[str] | None = None):
+    query = db.query(FileRecord).filter(FileRecord.file_type == "video", FileRecord.is_deleted.is_(False))
+    if file_ids:
+        query = query.filter(FileRecord.id.in_(file_ids))
+    if options.directory_ids:
+        query = query.filter(FileRecord.directory_id.in_(options.directory_ids))
+    return query.order_by(FileRecord.name.asc()).all()
+
+
+@router.post("/bulk-rename/preview")
+async def preview_bulk_rename(body: BulkRenameOptions):
+    db = get_db()
+    try:
+        rows = _bulk_rename_rows(db, body)
+        return {"items": [{"file_id": row.id, "original_name": row.name, "new_name": _bulk_rename_name(row.name, body), "path": row.path} for row in rows]}
+    finally:
+        close_db(db)
+
+
+@router.post("/bulk-rename/apply")
+async def apply_bulk_rename(body: BulkRenameApplyRequest):
+    db = get_db()
+    try:
+        rows = _bulk_rename_rows(db, body, body.file_ids)
+        used: set[str] = set()
+        results = []
+        for row in rows:
+            new_name = _bulk_rename_name(row.name, body)
+            candidate = new_name
+            index = 2
+            while candidate in used or (candidate != row.name and os.path.exists(os.path.join(os.path.dirname(row.path), candidate))):
+                stem, ext = os.path.splitext(new_name)
+                candidate = f"{stem} ({index}){ext}"
+                index += 1
+            used.add(candidate)
+            if candidate == row.name:
+                results.append({"file_id": row.id, "status": "unchanged", "original_name": row.name, "new_name": candidate})
+                continue
+            old_path = row.path
+            new_path = os.path.join(os.path.dirname(old_path), candidate)
+            if os.path.exists(old_path):
+                os.rename(old_path, new_path)
+            row.name = candidate
+            row.path = new_path
+            results.append({"file_id": row.id, "status": "renamed", "original_name": os.path.basename(old_path), "new_name": candidate})
+        db.commit()
+        return {"items": results}
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        close_db(db)
 
 
 def _rate_to_float(value: str | None) -> float | None:

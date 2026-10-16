@@ -12,7 +12,8 @@ services:
       - "8010:8010"
     runtime: nvidia
     volumes:
-      - /mnt/user/videos:/videos
+      # - /mnt/user/videos:/videos
+      - D:\Git\unRAID\SceneWhisper\videos:/videos
       - /mnt/user/appdata/docker-compose-projects/SceneWhisper/data:/data
       - /mnt/user/appdata/docker-compose-projects/SceneWhisper/hf-cache:/root/.cache/huggingface
     # GPU hosts:

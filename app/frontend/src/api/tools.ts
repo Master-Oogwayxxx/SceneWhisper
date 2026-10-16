@@ -30,6 +30,14 @@ function fromApiItem(item: ApiBookmarkVideoCheckItem): BookmarkVideoCheckItem {
 }
 
 export const toolsApi = {
+  async previewBulkRename(options: BulkRenameOptions): Promise<BulkRenameItem[]> {
+    const res = await axios.post<{ items: ApiBulkRenameItem[] }>(`${API_BASE}/tools/bulk-rename/preview`, options)
+    return res.data.items.map(fromApiBulkRenameItem)
+  },
+  async applyBulkRename(options: BulkRenameApplyOptions): Promise<BulkRenameItem[]> {
+    const res = await axios.post<{ items: ApiBulkRenameItem[] }>(`${API_BASE}/tools/bulk-rename/apply`, options)
+    return res.data.items.map(fromApiBulkRenameItem)
+  },
   async scanSubtitleHealth(): Promise<SubtitleHealthResponse> {
     const res = await axios.get<ApiSubtitleHealthResponse>(`${API_BASE}/tools/subtitles/health`)
     return {
@@ -142,6 +150,12 @@ export const toolsApi = {
     }
   },
 }
+
+interface ApiBulkRenameItem { file_id: string; original_name: string; new_name: string; path?: string; status?: string }
+function fromApiBulkRenameItem(item: ApiBulkRenameItem): BulkRenameItem { return { fileId: item.file_id, originalName: item.original_name, newName: item.new_name, path: item.path, status: item.status } }
+export interface BulkRenameOptions { directory_ids: string[]; remove_miscellaneous: boolean; remove_resolution: boolean; extract_video_code: boolean; normalize_separators: boolean; remove_release_tags: boolean; remove_website: boolean; remove_dates: boolean; find_text: string; replace_text: string }
+export interface BulkRenameApplyOptions extends BulkRenameOptions { file_ids: string[] }
+export interface BulkRenameItem { fileId: string; originalName: string; newName: string; path?: string; status?: string }
 
 interface ApiSubtitleHealthItem {
   file: File

@@ -222,7 +222,19 @@ export const fileApi = {
 
   async getDirectories(): Promise<DirectoryRecord[]> {
     const res = await axios.get(`${API_BASE}/directory`)
-    return res.data
+    // Keep the File Browser resilient if an API/proxy wrapper returns the
+    // collection under a named property instead of returning the array directly.
+    const directories = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(res.data?.directories)
+        ? res.data.directories
+        : Array.isArray(res.data?.data)
+          ? res.data.data
+          : null
+    if (!directories) {
+      throw new Error('Invalid directory response')
+    }
+    return directories
   },
 
   async cleanupMissingFiles(directoryPath?: string): Promise<{ deleted_files: string[]; deleted_directories: string[]; total_deleted: number }> {

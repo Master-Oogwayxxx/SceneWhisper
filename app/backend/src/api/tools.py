@@ -26,6 +26,7 @@ from ..models.models import BookmarkMatchedFile, BookmarkVideoCheckRequest, Book
 from ..schemas.db_helper import close_db, get_db
 from ..schemas.file import FileRecord
 from ..schemas.frame_pacing_analysis import FramePacingAnalysisRunRecord
+from ..utils import is_pyscenedetect_split
 
 router = APIRouter(prefix="/api/tools")
 DEFAULT_FRAME_PACING_ANALYZER_TIMEOUT_SECONDS = 30 * 60
@@ -145,6 +146,7 @@ class BulkRenameOptions(BaseModel):
     remove_dates: bool = False
     find_text: str = ""
     replace_text: str = ""
+    hide_split_videos: bool = False
 
 
 class BulkRenameApplyRequest(BulkRenameOptions):
@@ -183,7 +185,10 @@ def _bulk_rename_rows(db, options: BulkRenameOptions, file_ids: list[str] | None
         query = query.filter(FileRecord.id.in_(file_ids))
     if options.directory_ids:
         query = query.filter(FileRecord.directory_id.in_(options.directory_ids))
-    return query.order_by(FileRecord.name.asc()).all()
+    rows = query.order_by(FileRecord.name.asc()).all()
+    if options.hide_split_videos:
+        rows = [row for row in rows if row.parent_id is None and not is_pyscenedetect_split(Path(row.path))]
+    return rows
 
 
 @router.post("/bulk-rename/preview")

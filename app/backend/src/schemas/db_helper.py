@@ -7,9 +7,11 @@ from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 
-# Database file location - stored in persistent volume
-# Use the absolute path where you mounted the volume in docker-compose
-DB_DIR = Path(os.getenv("DB_STORAGE_PATH", "/data"))
+# Database file location - stored in the configured persistent volume in Docker,
+# or in the backend's local data directory when running uvicorn/npm dev locally.
+# DB_STORAGE_PATH remains an explicit override for either environment.
+_configured_db_dir = os.getenv("DB_STORAGE_PATH")
+DB_DIR = Path(_configured_db_dir) if _configured_db_dir else Path(__file__).resolve().parents[2] / "data"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DB_DIR / "videoprocessor.db"
 

@@ -31,6 +31,19 @@ from ..utils import generate_filename_id, get_video_metadata, is_ignored
 router = APIRouter(prefix="/api/directory")
 
 
+def _video_storage_path() -> Path:
+    """Resolve the video root for Docker and local development."""
+    configured_path = os.getenv("VIDEO_STORAGE_PATH")
+    if configured_path:
+        return Path(configured_path)
+
+    docker_path = Path("/videos")
+    if os.name != "nt" and docker_path.exists():
+        return docker_path
+
+    return Path(__file__).resolve().parents[4] / "videos"
+
+
 def find_folder_path(start_dir, folder_name):
     # Search recursively for the folder name
     for path in Path(start_dir).rglob(folder_name):
@@ -254,7 +267,7 @@ async def list_directories(db: Session = Depends(db_session)):
 @router.get("/top_level")
 def get_top_level_directories():
     """List immediate subdirectories of VIDEO_STORAGE_PATH (excludes 'scenes' dirs)."""
-    base_path = Path(os.getenv("VIDEO_STORAGE_PATH", "/videos"))
+    base_path = _video_storage_path()
     if not base_path.exists():
         return []
     dirs = [
@@ -273,8 +286,7 @@ async def scan_all_directories_stream(
 ):
 
     async def event_generator():
-        base_path_str = os.getenv("VIDEO_STORAGE_PATH", "/videos")
-        videos_path = Path(base_path_str)
+        videos_path = _video_storage_path()
 
         if not videos_path.exists():
             yield {"event": "error", "data": "Path not found"}
@@ -314,7 +326,7 @@ async def scan_all_directories_stream(
 
             # Estimate total from DB — avoids a full pre-scan filesystem walk.
             # Accurate for rescans; adjusts dynamically as new files are discovered.
-            base_prefix = base_path_str.rstrip("/") + "/"
+            base_prefix = str(videos_path).rstrip("\\/") + os.sep
             if allowed_dirs is None:
                 total_files = sum(1 for p in known_files if p.startswith(base_prefix))
             else:
@@ -700,7 +712,7 @@ async def get_directory_tree(path: str, db: Session = Depends(db_session)):
     # Resolve the physical path
     full_path = Path(path)
     if full_path == Path("/videos"):
-        full_path = Path(os.getenv("VIDEO_STORAGE_PATH", "/videos"))
+        full_path = _video_storage_path()
 
     # 1. Fetch all directory records in a single query to avoid N+1 issues
     all_directories = directory_crud.get_directory_hierarchy()
@@ -804,7 +816,7 @@ async def cleanup_missing_files_stream(
         all_dirs = directory_crud.get_directory_hierarchy()
 
         if directories:
-            base = Path(os.getenv("VIDEO_STORAGE_PATH", "/videos"))
+            base = _video_storage_path()
             dir_names = [d.strip() for d in directories.split(",") if d.strip()]
             allowed_prefixes = [str(base / name).rstrip("/") + "/" for name in dir_names]
             all_files = [
@@ -937,7 +949,7 @@ async def cleanup_unused_subtitles_stream(
         subtitle_files = [f for f in all_files if f.file_type == "subtitle"]
 
         if directories:
-            base = Path(os.getenv("VIDEO_STORAGE_PATH", "/videos"))
+            base = _video_storage_path()
             dir_names = [d.strip() for d in directories.split(",") if d.strip()]
             allowed_prefixes = [str(base / name).rstrip("/") + "/" for name in dir_names]
             subtitle_files = [

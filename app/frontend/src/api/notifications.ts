@@ -1,10 +1,10 @@
 import { Notification, NotificationsResponse } from '@/types/types'
 
-import { API_BASE } from '@/api/client'
+import { apiUrl } from '@/api/client'
 
 export const notificationApi = {
   async getNotifications(page: number = 1, limit: number = 50): Promise<NotificationsResponse> {
-    const res = await fetch(`${API_BASE}/notifications?page=${page}&limit=${limit}`)
+    const res = await fetch(apiUrl(`/notifications?page=${page}&limit=${limit}`))
     if (!res.ok) {
       throw new Error('Failed to fetch notifications')
     }
@@ -12,7 +12,7 @@ export const notificationApi = {
   },
 
   async markRead(id: string): Promise<void> {
-    const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
+    const res = await fetch(apiUrl(`/notifications/${id}/read`), {
       method: 'PATCH',
     })
     if (!res.ok) {
@@ -21,7 +21,7 @@ export const notificationApi = {
   },
 
   async markAllRead(): Promise<void> {
-    const res = await fetch(`${API_BASE}/notifications/read-all`, {
+    const res = await fetch(apiUrl('/notifications/read-all'), {
       method: 'POST',
     })
     if (!res.ok) {
@@ -30,7 +30,7 @@ export const notificationApi = {
   },
 
   async clearAll(): Promise<void> {
-    const res = await fetch(`${API_BASE}/notifications`, {
+    const res = await fetch(apiUrl('/notifications'), {
       method: 'DELETE',
     })
     if (!res.ok) {

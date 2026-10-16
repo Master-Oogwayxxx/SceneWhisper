@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import threading
 import time
@@ -7,7 +8,9 @@ from pathlib import Path
 from sqlite3 import OperationalError as SQLiteOperationalError
 
 _TASK_ID_RE = re.compile(r"\[Task ([a-fA-F0-9\-]+)\]")
-_LOG_DIR = Path("/data/logs")
+_configured_data_dir = os.getenv("DB_STORAGE_PATH")
+_DATA_DIR = Path(_configured_data_dir) if _configured_data_dir else Path(__file__).resolve().parents[1] / "data"
+_LOG_DIR = _DATA_DIR / "logs"
 _prune_lock = threading.Lock()
 _last_prune_time = time.time()
 _prune_interval = 60  # Only prune once per 60 seconds

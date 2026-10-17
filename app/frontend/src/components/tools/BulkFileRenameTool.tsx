@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, FilePenLine } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, FilePenLine } from 'lucide-react'
 import { fileApi } from '@/api/files'
 import { toolsApi, type BulkRenameItem, type BulkRenameOptions } from '@/api/tools'
 import { formatBytes, formatDate } from './toolUtils'
@@ -26,6 +26,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   const [lastAppliedItems, setLastAppliedItems] = useState<BulkRenameItem[] | null>(null)
   const [selectedFileIds, setSelectedFileIds] = useState<string[]>([])
   const [lastSelectedFileId, setLastSelectedFileId] = useState<string | null>(null)
+  const [sort, setSort] = useState<{ key: 'originalName' | 'createdAt' | 'size'; direction: 'asc' | 'desc' }>({ key: 'originalName', direction: 'asc' })
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [directoryDialogOpen, setDirectoryDialogOpen] = useState(true)
@@ -47,8 +48,21 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     replace_text: '',
     remove_first_n: 0,
     remove_last_n: 0,
+    translate_to_english: false,
     hide_split_videos: true,
   })
+  const sortedItems = useMemo(() => [...items].sort((a, b) => {
+    const aValue = a[sort.key] ?? ''
+    const bValue = b[sort.key] ?? ''
+    const comparison = typeof aValue === 'number' && typeof bValue === 'number'
+      ? aValue - bValue
+      : String(aValue).localeCompare(String(bValue), undefined, { numeric: true, sensitivity: 'base' })
+    return sort.direction === 'asc' ? comparison : -comparison
+  }), [items, sort])
+  const toggleSort = (key: typeof sort.key) => setSort((current) => current.key === key ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' })
+  const sortIcon = (key: typeof sort.key) => sort.key === key
+    ? (sort.direction === 'asc' ? <ArrowUp className='h-3.5 w-3.5' /> : <ArrowDown className='h-3.5 w-3.5' />)
+    : <ArrowUpDown className='h-3.5 w-3.5 opacity-50' />
 
   useEffect(() => {
     fileApi
@@ -63,12 +77,12 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
       const row = target.closest('tr')
       const table = row?.closest('table')
       if (!row || !table || row.rowIndex < 1) return
-      const item = items[row.rowIndex - 1]
+      const item = sortedItems[row.rowIndex - 1]
       if (item) selectFile(item.fileId, event.shiftKey)
     }
     document.addEventListener('click', handle)
     return () => document.removeEventListener('click', handle)
-  }, [items, lastSelectedFileId])
+  }, [items, lastSelectedFileId, sortedItems])
   const updateOption = (key: keyof BulkRenameOptions, value: boolean) => setOptions((current) => ({ ...current, [key]: value }))
   const toggleDirectory = (id: string) => {
     setAllDirectories(false)
@@ -186,6 +200,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     replace_text: '',
     remove_first_n: 0,
     remove_last_n: 0,
+    translate_to_english: false,
     hide_split_videos: true,
   })
 
@@ -241,6 +256,10 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
               <input type='number' min='0' value={options.remove_last_n} onChange={(event) => setOptions((current) => ({ ...current, remove_last_n: Math.max(0, Number(event.target.value) || 0) }))} className='w-full rounded border border-input bg-background px-2 py-1.5' />
             </label>
             <div className='border-t-2 border-border' />
+            <label className='flex items-center gap-2 text-sm'>
+              <input type='checkbox' checked={options.translate_to_english} onChange={(event) => updateOption('translate_to_english', event.target.checked)} />
+              Translate Japanese to English
+            </label>
             {renameChecks.map(([key, label]) => (
               <label key={key} className='flex items-center gap-2 text-sm'>
                 <input
@@ -287,14 +306,14 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
                     }}
                   />
                 </th>
-                <th className='w-[35%] p-3 font-semibold'>Original file name</th>
+                <th className='w-[35%] p-3 font-semibold'><button type='button' onClick={() => toggleSort('originalName')} className='inline-flex items-center gap-1'>Original file name {sortIcon('originalName')}</button></th>
                 <th className='w-[35%] p-3 font-semibold'>Preview name</th>
-                <th className='w-[15%] p-3 font-semibold'>Created</th>
-                <th className='w-[10%] p-3 font-semibold'>Size</th>
+                <th className='w-[15%] p-3 font-semibold'><button type='button' onClick={() => toggleSort('createdAt')} className='inline-flex items-center gap-1'>Created {sortIcon('createdAt')}</button></th>
+                <th className='w-[10%] p-3 font-semibold'><button type='button' onClick={() => toggleSort('size')} className='inline-flex items-center gap-1'>Size {sortIcon('size')}</button></th>
               </tr>
             </thead>
             <tbody className='[&_td]:overflow-hidden'>
-              {items.map((item) => (
+              {sortedItems.map((item) => (
                 <tr key={item.fileId} onContextMenu={(event) => { event.preventDefault(); setRenameItem(item); setRenameValue(item.originalName.replace(/\.[^.]+$/, '')) }} className='border-b border-border last:border-0'>
                   <td className='p-3 align-top'>
                     <input

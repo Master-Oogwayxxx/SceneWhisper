@@ -149,6 +149,7 @@ class BulkRenameOptions(BaseModel):
     replace_text: str = ""
     remove_first_n: int = 0
     remove_last_n: int = 0
+    translate_to_english: bool = False
     hide_split_videos: bool = False
 
 
@@ -172,6 +173,10 @@ def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
         start = max(0, options.remove_first_n)
         end = len(stem) - max(0, options.remove_last_n) if options.remove_last_n else len(stem)
         stem = stem[start:end] if end > start else ""
+    if options.translate_to_english and stem:
+        from argostranslate import translate
+
+        stem = translate.translate(stem, "ja", "en")
     if options.find_text:
         stem = stem.replace(options.find_text, options.replace_text)
     if options.remove_dates:
@@ -211,7 +216,7 @@ def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
     if options.normalize_separators:
         stem = re.sub(r"_+", "-", stem)
         stem = re.sub(r"\.+", " ", stem)
-        stem = re.sub(r"\s+", " ", stem).strip(" .-_")
+        stem = re.sub(r"\s+", " ", stem).strip().strip(".-_").strip()
         stem = re.sub(r"\s*-\s*", "-", stem)
     if not stem:
         return name

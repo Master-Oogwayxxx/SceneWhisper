@@ -136,6 +136,7 @@ class DeleteSubtitleHealthFilesResponse(BaseModel):
 
 
 class BulkRenameOptions(BaseModel):
+    file_ids: list[str] = []
     directory_ids: list[str] = []
     remove_miscellaneous: bool = True
     remove_non_english: bool = False
@@ -167,16 +168,24 @@ class BulkRenameUndoRequest(BaseModel):
     items: list[BulkRenameUndoItem]
 
 
+def _translate_japanese_to_english(value: str) -> str:
+    try:
+        from argostranslate import translate
+
+        translation = translate.get_translation_from_codes("ja", "en")
+    except Exception as exc:
+        raise RuntimeError("Japanese-to-English translation is unavailable") from exc
+    if translation is None:
+        raise RuntimeError("Japanese-to-English translation model is not installed")
+    return translation.translate(value)
+
+
 def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
     stem, extension = os.path.splitext(name)
     if options.remove_first_n or options.remove_last_n:
         start = max(0, options.remove_first_n)
         end = len(stem) - max(0, options.remove_last_n) if options.remove_last_n else len(stem)
         stem = stem[start:end] if end > start else ""
-    if options.translate_to_english and stem:
-        from argostranslate import translate
-
-        stem = translate.translate(stem, "ja", "en")
     if options.find_text:
         stem = stem.replace(options.find_text, options.replace_text)
     if options.remove_dates:
@@ -196,6 +205,8 @@ def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
             stem,
             flags=re.IGNORECASE,
         )
+    if options.translate_to_english and stem:
+        stem = _translate_japanese_to_english(stem)
     code_match = re.search(r"\b([A-Za-z]{2,8})[-_ ]?(\d{2,5})\b", stem, re.IGNORECASE)
     code = f"{code_match.group(1).upper()}-{code_match.group(2)}" if code_match else ""
     suffix_match = re.search(r"(?:^|[-_ ])(RM|SUB|UC)\b", stem, re.IGNORECASE)
@@ -239,8 +250,11 @@ def _bulk_rename_rows(db, options: BulkRenameOptions, file_ids: list[str] | None
 async def preview_bulk_rename(body: BulkRenameOptions):
     db = get_db()
     try:
-        rows = _bulk_rename_rows(db, body)
-        return {"items": [{"file_id": row.id, "original_name": row.name, "new_name": _bulk_rename_name(row.name, body), "path": row.path, "created_at": row.created_at, "size": row.size} for row in rows]}
+        rows = _bulk_rename_rows(db, body, body.file_ids or None)
+        try:
+            return {"items": [{"file_id": row.id, "original_name": row.name, "new_name": _bulk_rename_name(row.name, body), "path": row.path, "created_at": row.created_at, "size": row.size} for row in rows]}
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
     finally:
         close_db(db)
 
@@ -252,8 +266,12 @@ async def apply_bulk_rename(body: BulkRenameApplyRequest):
         rows = _bulk_rename_rows(db, body, body.file_ids)
         used: set[str] = set()
         results = []
+        try:
+            renamed_names = {row.id: _bulk_rename_name(row.name, body) for row in rows}
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         for row in rows:
-            new_name = _bulk_rename_name(row.name, body)
+            new_name = renamed_names[row.id]
             candidate = new_name
             index = 2
             while candidate in used or (candidate != row.name and os.path.exists(os.path.join(os.path.dirname(row.path), candidate))):

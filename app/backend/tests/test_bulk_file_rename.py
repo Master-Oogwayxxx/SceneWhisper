@@ -28,3 +28,14 @@ def test_bulk_rename_removes_dates_and_resolution_next_to_underscores():
     name = "29.08.2025_WEBDL_YURIEVIJ__011225 001_AN IMMORAL TWO DAYS FOR A SCHOOL TRIP_1080P.mp4"
 
     assert _bulk_rename_name(name, options) == "WEBDL-YURIEVIJ-001-AN IMMORAL TWO DAYS FOR A SCHOOL TRIP.mp4"
+
+
+def test_bulk_rename_translates_before_removing_non_english(monkeypatch):
+    def translate(value):
+        assert "日本語" in value
+        return value.replace("日本語", "Japanese")
+
+    monkeypatch.setattr("src.api.tools._translate_japanese_to_english", translate)
+    options = BulkRenameOptions(translate_to_english=True, remove_non_english=True)
+
+    assert _bulk_rename_name("日本語 video.mp4", options) == "Japanese video.mp4"

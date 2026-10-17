@@ -38,7 +38,8 @@ COPY app/backend/requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
     python3.11 -m pip install --no-cache-dir -r requirements.txt \
     && python3.11 -m pip install --no-cache-dir hf_transfer \
-    && python3.11 -c "import argostranslate.package; argostranslate.package.update_package_index(); package = next(p for p in argostranslate.package.get_available_packages() if p.from_code == 'ja' and p.to_code == 'en'); argostranslate.package.install_from_path(package.download())"
+    && python3.11 -c "import argostranslate.package; argostranslate.package.update_package_index(); package = next(p for p in argostranslate.package.get_available_packages() if p.from_code == 'ja' and p.to_code == 'en'); argostranslate.package.install_from_path(package.download())" \
+    && python3.11 -c "from argostranslate import translate; translation = translate.get_translation_from_codes('ja', 'en'); assert translation is not None, 'Argos ja->en model was not installed'; print('Verified Argos ja->en translation model')"
 
 COPY app/backend ./
 COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, FilePenLine } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, FilePenLine, Loader2 } from 'lucide-react'
 import { fileApi } from '@/api/files'
 import { toolsApi, type BulkRenameItem, type BulkRenameOptions } from '@/api/tools'
 import { formatBytes, formatDate } from './toolUtils'
@@ -28,6 +28,9 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   const [lastSelectedFileId, setLastSelectedFileId] = useState<string | null>(null)
   const [sort, setSort] = useState<{ key: 'originalName' | 'createdAt' | 'size'; direction: 'asc' | 'desc' }>({ key: 'originalName', direction: 'asc' })
   const [busy, setBusy] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [previewingFileIds, setPreviewingFileIds] = useState<string[]>([])
+  const previewRequestIdRef = useRef(0)
   const [message, setMessage] = useState('')
   const [directoryDialogOpen, setDirectoryDialogOpen] = useState(true)
   const [allDirectories, setAllDirectories] = useState(true)
@@ -98,20 +101,40 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     setLastSelectedFileId(fileId)
   }
   const preview = async (optionsOverride?: BulkRenameOptions, selectionOverride?: string[]) => {
+    const requestId = ++previewRequestIdRef.current
     const previousSelection = new Set(selectionOverride ?? selectedFileIds)
+    if (!previousSelection.size && items.length) {
+      setItems((current) => current.map((item) => ({ ...item, newName: item.originalName })))
+      setBusy(false)
+      setPreviewing(false)
+      setPreviewingFileIds([])
+      return
+    }
     setBusy(true)
+    setPreviewing(true)
+    setPreviewingFileIds(Array.from(previousSelection))
     setMessage('')
     try {
-      const next = { ...(optionsOverride ?? options), directory_ids: allDirectories ? [] : directoryIds }
+      const next = { ...(optionsOverride ?? options), directory_ids: allDirectories ? [] : directoryIds, file_ids: previousSelection.size ? Array.from(previousSelection) : undefined }
       if (optionsOverride) setOptions(next)
       const nextItems = await toolsApi.previewBulkRename(next)
-      setItems(nextItems)
+      if (requestId !== previewRequestIdRef.current) return
+      setItems((current) => {
+        if (!previousSelection.size) return nextItems
+        const byId = new Map(nextItems.map((item) => [item.fileId, item]))
+        return current.map((item) => byId.get(item.fileId) ?? item)
+      })
       setSelectedFileIds(nextItems.filter((item) => previousSelection.has(item.fileId)).map((item) => item.fileId))
       setLastSelectedFileId(null)
-    } catch {
-      setMessage('Preview failed')
+    } catch (error) {
+      if (requestId !== previewRequestIdRef.current) return
+      const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+      setMessage(detail ? `Preview failed: ${detail}` : 'Preview failed')
     } finally {
+      if (requestId !== previewRequestIdRef.current) return
       setBusy(false)
+      setPreviewing(false)
+      setPreviewingFileIds([])
     }
   }
   const updateHideSplitVideos = async (value: boolean) => {
@@ -307,7 +330,12 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
                   />
                 </th>
                 <th className='w-[35%] p-3 font-semibold'><button type='button' onClick={() => toggleSort('originalName')} className='inline-flex items-center gap-1'>Original file name {sortIcon('originalName')}</button></th>
-                <th className='w-[35%] p-3 font-semibold'>Preview name</th>
+                <th className='w-[35%] p-3 font-semibold'>
+                  <span className='inline-flex items-center gap-2'>
+                    Preview name
+                    {previewing && <Loader2 className='h-3.5 w-3.5 animate-spin text-muted-foreground' aria-label='Updating preview' />}
+                  </span>
+                </th>
                 <th className='w-[15%] p-3 font-semibold'><button type='button' onClick={() => toggleSort('createdAt')} className='inline-flex items-center gap-1'>Created {sortIcon('createdAt')}</button></th>
                 <th className='w-[10%] p-3 font-semibold'><button type='button' onClick={() => toggleSort('size')} className='inline-flex items-center gap-1'>Size {sortIcon('size')}</button></th>
               </tr>
@@ -323,6 +351,12 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
                       onChange={(event) => {
                         const shiftKey = event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey
                         selectFile(item.fileId, shiftKey)
+                        if (options.translate_to_english) {
+                          const nextSelection = event.target.checked
+                            ? Array.from(new Set([...selectedFileIds, item.fileId]))
+                            : selectedFileIds.filter((id) => id !== item.fileId)
+                          void preview(undefined, nextSelection)
+                        }
                         if (!event.target.checked) {
                           setItems((current) => current.map((currentItem) => currentItem.fileId === item.fileId ? { ...currentItem, newName: currentItem.originalName } : currentItem))
                         }
@@ -330,8 +364,14 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
                     />
                   </td>
                   <td className='break-all p-3 align-top'>{item.originalName}</td>
-                  <td className={item.originalName === item.newName ? 'break-all p-3 align-top text-muted-foreground' : 'break-all p-3 align-top font-medium text-primary'}>
-                    {item.newName}
+                  <td className='break-all p-3 align-top'>
+                    {previewing && previewingFileIds.includes(item.fileId) ? (
+                      <div className='h-5 w-4/5 animate-pulse rounded bg-secondary' aria-label='Updating preview' />
+                    ) : (
+                      <span className={item.originalName === item.newName ? 'text-muted-foreground' : 'font-medium text-primary'}>
+                        {item.newName}
+                      </span>
+                    )}
                   </td>
                   <td className='break-words p-3 align-top text-muted-foreground'>{formatDate(item.createdAt)}</td>
                   <td className='break-words p-3 align-top text-muted-foreground'>{formatBytes(item.size)}</td>

@@ -389,10 +389,35 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
   };
 
   const updateEditState = (sceneId: string, field: keyof EditState, value: string) => {
-    setEditStates(prev => ({
-      ...prev,
-      [sceneId]: { ...prev[sceneId], [field]: value }
-    }));
+    setEditStates(prev => {
+      const nextEditStates = {
+        ...prev,
+        [sceneId]: { ...prev[sceneId], [field]: value },
+      };
+
+      // Keep adjacent scenes contiguous when an ending is moved. Use the
+      // effective display order so this also works with unsaved scenes.
+      if (field === 'end_timecode' && isValidTimecode(value)) {
+        const displayScenes = getDisplayScenes(scenes, nextEditStates, scenesToDelete);
+        const sceneIndex = displayScenes.findIndex(scene => scene.id === sceneId);
+        const nextScene = sceneIndex >= 0 ? displayScenes[sceneIndex + 1] : undefined;
+
+        if (nextScene) {
+          const nextStart = nextScene.kind === 'saved'
+            ? nextEditStates[nextScene.id]?.start_timecode ?? nextScene.scene.start_timecode
+            : nextScene.editState.start_timecode;
+          const nextEnd = nextScene.kind === 'saved'
+            ? nextEditStates[nextScene.id]?.end_timecode ?? nextScene.scene.end_timecode
+            : nextScene.editState.end_timecode;
+          nextEditStates[nextScene.id] = {
+            ...(nextEditStates[nextScene.id] ?? { start_timecode: nextStart, end_timecode: nextEnd }),
+            start_timecode: value,
+          };
+        }
+      }
+
+      return nextEditStates;
+    });
   };
 
   const saveAllEdits = () => {

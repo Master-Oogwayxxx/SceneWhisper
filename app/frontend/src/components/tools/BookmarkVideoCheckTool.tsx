@@ -7,8 +7,18 @@ import type { BookmarkVideoCheckItem, DirectoryRecord } from '@/types/types'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useSettings } from '@/hooks/useSettings'
+import { buildExternalVideoTargetUrl, isValidExternalVideoTarget } from '@/lib/external-video-targets'
 import { BookmarkStatusBadge, MatchedFilesSummary, parseGoogleBookmarks, type StatusFilter } from './toolUtils'
 
 interface BookmarkVideoCheckToolProps {
@@ -16,6 +26,7 @@ interface BookmarkVideoCheckToolProps {
 }
 
 export function BookmarkVideoCheckTool({ onBack }: BookmarkVideoCheckToolProps) {
+  const { settings } = useSettings()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const lastSelectedRowIdRef = useRef<string | null>(null)
   const [items, setItems] = useState<BookmarkVideoCheckItem[]>([])
@@ -30,6 +41,17 @@ export function BookmarkVideoCheckTool({ onBack }: BookmarkVideoCheckToolProps) 
   const [hasChecked, setHasChecked] = useState(false)
   const [isChecking, setIsChecking] = useState(false)
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set())
+  const [selectedExternalTargetKeys, setSelectedExternalTargetKeys] = useState<Set<string>>(() => new Set())
+  const [includeOriginalUrl, setIncludeOriginalUrl] = useState(false)
+
+  const externalVideoTargets = useMemo(
+    () => settings.external_video_targets.filter(isValidExternalVideoTarget),
+    [settings.external_video_targets]
+  )
+  const selectedExternalTargets = useMemo(
+    () => externalVideoTargets.filter((target) => selectedExternalTargetKeys.has(target.label + target.url_template)),
+    [externalVideoTargets, selectedExternalTargetKeys]
+  )
 
   useEffect(() => {
     void fileApi.getDirectories().then(setDiskDirectories).catch(() => toast.error('Failed to load disk directories'))
@@ -186,15 +208,34 @@ export function BookmarkVideoCheckTool({ onBack }: BookmarkVideoCheckToolProps) 
     })
   }
 
-  const openSelectedBookmarks = () => {
-    let openedCount = 0
-    for (const item of selectedItems) {
-      const tab = window.open(item.url, '_blank', 'noopener,noreferrer')
-      if (tab) openedCount += 1
+  const openSelectedBookmarks = async () => {
+    if (selectedItems.length === 0 || (selectedExternalTargets.length === 0 && !includeOriginalUrl)) return
+
+    const links = [
+      ...selectedItems.flatMap((item) => selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, item.videoCode))),
+      ...(includeOriginalUrl ? selectedItems.map((item) => item.url) : []),
+    ]
+    const openedTabs = links.map(() => {
+      const tab = window.open('about:blank', '_blank')
+      if (!tab) return null
+      try { tab.opener = null } catch { /* Opening still works without reassignment. */ }
+      return tab
+    })
+    for (let index = 0; index < openedTabs.length; index += 1) {
+      if (openedTabs[index]) openedTabs[index]!.location.href = links[index]
+      if (index < openedTabs.length - 1) await new Promise((resolve) => window.setTimeout(resolve, 100))
     }
-    if (openedCount < selectedItems.length) {
-      toast.error(`Opened ${openedCount} of ${selectedItems.length} selected bookmark${selectedItems.length === 1 ? '' : 's'}`)
-    }
+    const openedCount = openedTabs.filter((tab) => tab !== null).length
+    if (openedCount < links.length) toast.error(`Opened ${openedCount} of ${links.length} selected site link${links.length === 1 ? '' : 's'}`)
+  }
+
+  const toggleExternalTarget = (targetKey: string, checked: boolean) => {
+    setSelectedExternalTargetKeys((previous) => {
+      const next = new Set(previous)
+      if (checked) next.add(targetKey)
+      else next.delete(targetKey)
+      return next
+    })
   }
 
   return (
@@ -319,10 +360,42 @@ export function BookmarkVideoCheckTool({ onBack }: BookmarkVideoCheckToolProps) 
             </Button>
             <span className="text-sm text-muted-foreground">{selectedItems.length} selected</span>
           </div>
-          <Button type="button" size="sm" className="h-8 gap-2" onClick={openSelectedBookmarks}>
-            <ExternalLink className="h-4 w-4" aria-hidden />
-            Open Selected
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" size="sm" className="h-8 gap-2">
+                <ExternalLink className="h-4 w-4" aria-hidden />
+                Open Selected
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-52">
+              <DropdownMenuLabel>Select sites</DropdownMenuLabel>
+              <DropdownMenuCheckboxItem checked={includeOriginalUrl} onCheckedChange={(checked) => setIncludeOriginalUrl(checked === true)} onSelect={(event) => event.preventDefault()}>
+                Original URL
+              </DropdownMenuCheckboxItem>
+              {externalVideoTargets.map((target) => {
+                const targetKey = target.label + target.url_template
+                return (
+                  <DropdownMenuCheckboxItem key={targetKey} checked={selectedExternalTargetKeys.has(targetKey)} onCheckedChange={(checked) => toggleExternalTarget(targetKey, checked === true)} onSelect={(event) => event.preventDefault()}>
+                    {target.label}
+                  </DropdownMenuCheckboxItem>
+                )
+              })}
+              <DropdownMenuSeparator />
+              <div className="flex gap-1 px-1 pb-1">
+                <Button type="button" size="sm" variant="secondary" className="h-8 flex-1 text-xs" onClick={() => { setIncludeOriginalUrl(true); setSelectedExternalTargetKeys(new Set(externalVideoTargets.map((target) => target.label + target.url_template))) }}>
+                  Select all
+                </Button>
+                <Button type="button" size="sm" variant="secondary" className="h-8 flex-1 text-xs" onClick={() => { setIncludeOriginalUrl(false); setSelectedExternalTargetKeys(new Set()) }}>
+                  Clear
+                </Button>
+              </div>
+              <div className="px-1 pb-1">
+                <Button type="button" size="sm" className="h-8 w-full text-xs" disabled={selectedExternalTargets.length === 0 && !includeOriginalUrl} onClick={() => void openSelectedBookmarks()}>
+                  {includeOriginalUrl && selectedExternalTargets.length === 0 ? 'Open original URL' : `Open in ${selectedExternalTargets.length} selected ${selectedExternalTargets.length === 1 ? 'site' : 'sites'}${includeOriginalUrl ? ' + original URL' : ''}`}
+                </Button>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       ) : null}
 

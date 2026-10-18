@@ -86,7 +86,12 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     document.addEventListener('click', handle)
     return () => document.removeEventListener('click', handle)
   }, [items, lastSelectedFileId, sortedItems])
-  const updateOption = (key: keyof BulkRenameOptions, value: boolean) => setOptions((current) => ({ ...current, [key]: value }))
+  const updateOption = (key: keyof BulkRenameOptions, value: boolean) => setOptions((current) => ({
+    ...current,
+    [key]: value,
+    // Code-only extraction would discard the translated title from the preview.
+    ...(key === 'translate_to_english' && value ? { extract_video_code: false } : {}),
+  }))
   const toggleDirectory = (id: string) => {
     setAllDirectories(false)
     setDirectoryIds((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]))
@@ -166,13 +171,14 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
       void preview()
     }, 300)
     return () => window.clearTimeout(handle)
-  }, [options, allDirectories, directoryIds, directoryDialogOpen])
+  }, [options, allDirectories, directoryIds, selectedFileIds, directoryDialogOpen])
   const apply = async () => {
     const selected = items.filter((item) => selectedFileIds.includes(item.fileId))
     if (!selected.length) return
+    const appliedFileIds = [...selectedFileIds]
     setBusy(true)
     try {
-      const result = await toolsApi.applyBulkRename({ ...options, directory_ids: allDirectories ? [] : directoryIds, file_ids: selectedFileIds })
+      const result = await toolsApi.applyBulkRename({ ...options, directory_ids: allDirectories ? [] : directoryIds, file_ids: appliedFileIds })
       const byId = new Map(result.map((item) => [item.fileId, item]))
       setItems((current) => current.map((item) => byId.get(item.fileId) ?? item))
       setLastAppliedItems(result.filter((item) => item.status === 'renamed'))
@@ -183,6 +189,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
         queryClient.invalidateQueries({ queryKey: ['directories'] }),
         queryClient.invalidateQueries({ queryKey: ['tree-directory-file-counts'] }),
       ])
+      await preview(undefined, appliedFileIds)
       setMessage('Rename complete')
     } catch {
       setMessage('Rename failed')

@@ -39,3 +39,10 @@ def test_bulk_rename_translates_before_removing_non_english(monkeypatch):
     options = BulkRenameOptions(translate_to_english=True, remove_non_english=True)
 
     assert _bulk_rename_name("日本語 video.mp4", options) == "Japanese video.mp4"
+
+
+def test_bulk_rename_translation_keeps_title_when_code_extraction_is_enabled(monkeypatch):
+    monkeypatch.setattr("src.api.tools._translate_japanese_to_english", lambda value: value.replace("日本語", "Japanese"))
+    options = BulkRenameOptions(translate_to_english=True, extract_video_code=False)
+
+    assert _bulk_rename_name("ABC-123 日本語.mp4", options) == "ABC-123 Japanese.mp4"

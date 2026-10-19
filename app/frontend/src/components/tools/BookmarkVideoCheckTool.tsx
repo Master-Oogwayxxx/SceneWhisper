@@ -211,10 +211,10 @@ export function BookmarkVideoCheckTool({ onBack }: BookmarkVideoCheckToolProps) 
   const openSelectedBookmarks = async () => {
     if (selectedItems.length === 0 || (selectedExternalTargets.length === 0 && !includeOriginalUrl)) return
 
-    const links = [
-      ...selectedItems.flatMap((item) => selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, item.videoCode))),
-      ...(includeOriginalUrl ? selectedItems.map((item) => item.url) : []),
-    ]
+    const links = selectedItems.flatMap((item) => [
+      ...selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, item.videoCode)),
+      ...(includeOriginalUrl ? [item.url] : []),
+    ])
     const openedTabs = links.map(() => {
       const tab = window.open('about:blank', '_blank')
       if (!tab) return null

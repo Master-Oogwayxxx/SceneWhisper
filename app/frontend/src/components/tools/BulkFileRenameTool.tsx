@@ -31,6 +31,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   const [previewing, setPreviewing] = useState(false)
   const [previewingFileIds, setPreviewingFileIds] = useState<string[]>([])
   const previewRequestIdRef = useRef(0)
+  const refreshAllOnNextPreviewRef = useRef(false)
   const [message, setMessage] = useState('')
   const [directoryDialogOpen, setDirectoryDialogOpen] = useState(true)
   const [allDirectories, setAllDirectories] = useState(true)
@@ -52,6 +53,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     remove_first_n: 0,
     remove_last_n: 0,
     translate_to_english: false,
+    case_conversion: 'none',
     hide_split_videos: true,
   })
   const sortedItems = useMemo(() => [...items].sort((a, b) => {
@@ -70,7 +72,11 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     fileApi
       .getDirectories()
-      .then(setDirectories)
+      .then((records) => {
+        const rootIds = new Set(records.filter((directory) => directory.parent_id === null).map((directory) => directory.id))
+        const firstLevel = records.filter((directory) => directory.parent_id !== null && rootIds.has(directory.parent_id))
+        setDirectories(firstLevel.length ? firstLevel : records.filter((directory) => directory.parent_id === null))
+      })
       .catch(() => setMessage('Unable to load directories'))
   }, [])
   useEffect(() => {
@@ -105,10 +111,10 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     } else setSelectedFileIds((current) => (current.includes(fileId) ? current.filter((id) => id !== fileId) : [...current, fileId]))
     setLastSelectedFileId(fileId)
   }
-  const preview = async (optionsOverride?: BulkRenameOptions, selectionOverride?: string[]) => {
+  const preview = async (optionsOverride?: BulkRenameOptions, selectionOverride?: string[], includeAll = false) => {
     const requestId = ++previewRequestIdRef.current
     const previousSelection = new Set(selectionOverride ?? selectedFileIds)
-    if (!previousSelection.size && items.length) {
+    if (!includeAll && !previousSelection.size && items.length) {
       setItems((current) => current.map((item) => ({ ...item, newName: item.originalName })))
       setBusy(false)
       setPreviewing(false)
@@ -120,16 +126,17 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     setPreviewingFileIds(Array.from(previousSelection))
     setMessage('')
     try {
-      const next = { ...(optionsOverride ?? options), directory_ids: allDirectories ? [] : directoryIds, file_ids: previousSelection.size ? Array.from(previousSelection) : undefined }
+      const next = { ...(optionsOverride ?? options), directory_ids: allDirectories ? [] : directoryIds, file_ids: includeAll ? undefined : previousSelection.size ? Array.from(previousSelection) : undefined }
       if (optionsOverride) setOptions(next)
       const nextItems = await toolsApi.previewBulkRename(next)
       if (requestId !== previewRequestIdRef.current) return
       setItems((current) => {
-        if (!previousSelection.size) return nextItems
+        if (includeAll || !previousSelection.size) return nextItems
         const byId = new Map(nextItems.map((item) => [item.fileId, item]))
         return current.map((item) => byId.get(item.fileId) ?? item)
       })
-      setSelectedFileIds(nextItems.filter((item) => previousSelection.has(item.fileId)).map((item) => item.fileId))
+      const nextSelectedFileIds = nextItems.filter((item) => previousSelection.has(item.fileId)).map((item) => item.fileId)
+      setSelectedFileIds((current) => current.length === nextSelectedFileIds.length && current.every((id, index) => id === nextSelectedFileIds[index]) ? current : nextSelectedFileIds)
       setLastSelectedFileId(null)
     } catch (error) {
       if (requestId !== previewRequestIdRef.current) return
@@ -145,6 +152,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   const updateHideSplitVideos = async (value: boolean) => {
     const next = { ...options, hide_split_videos: value }
     setOptions(next)
+    refreshAllOnNextPreviewRef.current = true
   }
   const renameFile = async () => {
     if (!renameItem || !renameValue.trim() || renameValue === renameItem.originalName) return
@@ -168,7 +176,9 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     if (directoryDialogOpen) return
     const handle = window.setTimeout(() => {
-      void preview()
+      const includeAll = refreshAllOnNextPreviewRef.current
+      refreshAllOnNextPreviewRef.current = false
+      void preview(undefined, undefined, includeAll)
     }, 300)
     return () => window.clearTimeout(handle)
   }, [options, allDirectories, directoryIds, selectedFileIds, directoryDialogOpen])
@@ -231,6 +241,7 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     remove_first_n: 0,
     remove_last_n: 0,
     translate_to_english: false,
+    case_conversion: 'none',
     hide_split_videos: true,
   })
 
@@ -289,6 +300,14 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
             <label className='flex items-center gap-2 text-sm'>
               <input type='checkbox' checked={options.translate_to_english} onChange={(event) => updateOption('translate_to_english', event.target.checked)} />
               Translate Japanese to English
+            </label>
+            <label className='text-sm'>
+              <span className='mb-1 block font-medium'>Filename case</span>
+              <select value={options.case_conversion} onChange={(event) => setOptions((current) => ({ ...current, case_conversion: event.target.value as BulkRenameOptions['case_conversion'] }))} className='w-full rounded border border-input bg-background px-2 py-1.5'>
+                <option value='none'>Keep existing case</option>
+                <option value='capitalize'>Capitalize</option>
+                <option value='lower'>Lower case</option>
+              </select>
             </label>
             {renameChecks.map(([key, label]) => (
               <label key={key} className='flex items-center gap-2 text-sm'>

@@ -86,8 +86,12 @@ export function BookmarkVideoCheckTool({ onBack }: BookmarkVideoCheckToolProps) 
   const diskDirectoryLabel = diskSelectionLabel(selectedDiskDirectoryIds.length, selectableDiskDirectories(diskDirectories).length)
   const itemsForBookmarkDirectories = (directories: string[], sourceItems = allBookmarkItems) => {
     if (directories.length === 0) return []
-    const selected = new Set(directories)
-    return sourceItems.filter((item) => item.bookmarkPath && selected.has(item.bookmarkPath))
+    return sourceItems.filter((item) => {
+      if (!item.bookmarkPath) return false
+      return directories.some((directory) => (
+        item.bookmarkPath === directory || item.bookmarkPath.startsWith(`${directory} / `)
+      ))
+    })
   }
 
   useEffect(() => {

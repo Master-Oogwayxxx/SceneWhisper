@@ -46,3 +46,13 @@ def test_bulk_rename_translation_keeps_title_when_code_extraction_is_enabled(mon
     options = BulkRenameOptions(translate_to_english=True, extract_video_code=False)
 
     assert _bulk_rename_name("ABC-123 日本語.mp4", options) == "ABC-123 Japanese.mp4"
+
+
+@pytest.mark.parametrize(
+    ("case_conversion", "expected"),
+    [("capitalize", "A title with mixed case.MP4"), ("lower", "a title with mixed case.MP4")],
+)
+def test_bulk_rename_changes_stem_case_without_touching_extension(case_conversion, expected):
+    options = BulkRenameOptions(case_conversion=case_conversion)
+
+    assert _bulk_rename_name("a TITLE with MIXED case.MP4", options) == expected

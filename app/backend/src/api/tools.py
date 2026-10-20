@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Iterator
+from typing import Iterator, Literal
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -151,6 +151,7 @@ class BulkRenameOptions(BaseModel):
     remove_first_n: int = 0
     remove_last_n: int = 0
     translate_to_english: bool = False
+    case_conversion: Literal["none", "capitalize", "lower"] = "none"
     hide_split_videos: bool = False
 
 
@@ -229,6 +230,10 @@ def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
         stem = re.sub(r"\.+", " ", stem)
         stem = re.sub(r"\s+", " ", stem).strip().strip(".-_").strip()
         stem = re.sub(r"\s*-\s*", "-", stem)
+    if options.case_conversion == "capitalize":
+        stem = stem.capitalize()
+    elif options.case_conversion == "lower":
+        stem = stem.lower()
     if not stem:
         return name
     return f"{stem}{extension}"

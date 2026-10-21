@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ChevronsDownUp, ChevronsUpDown, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ExternalLink, Filter, RefreshCw, Search, SortAsc } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -13,10 +14,12 @@ import { scraperApi, ScraperVideoFilters, ScraperVideoSortBy, ScraperVideoSortDi
 import { activeScraperVideoFilterCount, ScraperVideosFilterDialog } from '@/components/ScraperVideosFilterDialog'
 import { truncateAtWordBoundary } from '@/lib/truncate'
 import { ScrapedVideo, ScraperSource } from '@/types/types'
+import { useSettings } from '@/hooks/useSettings'
+import { buildExternalVideoTargetUrl, isValidExternalVideoTarget } from '@/lib/external-video-targets'
 
 const PAGE_SIZE_OPTIONS = [15, 25, 50, 100] as const
 const TITLE_TRUNCATE_LENGTH = 50
-const OPEN_ALL_LINK_DELAY_MS = 1200
+const EXTERNAL_LINK_DELAY_MS = 100
 const REFRESH_SPIN_MIN_MS = 600
 const SORT_OPTIONS: { value: ScraperVideoSortBy; label: string }[] = [
   { value: 'scraped_at', label: 'Scraper' },
@@ -147,10 +150,18 @@ export function ScraperVideosDialog({
   onSortByChange,
   onSortDirChange,
 }: ScraperVideosDialogProps) {
+  const { settings } = useSettings()
   const linkedVideos = videos.filter((video) => video.url && videoMatchesFilters(video, filters))
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false)
   const [isRefreshSpinning, setIsRefreshSpinning] = useState(false)
   const [expandedTitles, setExpandedTitles] = useState<Record<string, boolean>>({})
+  const [selectedExternalTargetKeys, setSelectedExternalTargetKeys] = useState<Set<string>>(() => new Set())
+  const [includeOriginalUrl, setIncludeOriginalUrl] = useState(false)
+  const externalVideoTargets = useMemo(() => settings.external_video_targets.filter(isValidExternalVideoTarget), [settings.external_video_targets])
+  const selectedExternalTargets = useMemo(
+    () => externalVideoTargets.filter((target) => selectedExternalTargetKeys.has(target.label + target.url_template)),
+    [externalVideoTargets, selectedExternalTargetKeys]
+  )
   const expandableVideos = videos.filter((video) => (video.title || 'Untitled').length > TITLE_TRUNCATE_LENGTH)
   const allExpandableTitlesExpanded = expandableVideos.length > 0 && expandableVideos.every((video) => expandedTitles[video.id])
   const filterCount = activeScraperVideoFilterCount(filters)
@@ -210,62 +221,37 @@ export function ScraperVideosDialog({
     void markVideosOpened([video.id])
   }
 
-  const openAllLinks = async () => {
-    const openedIds: string[] = []
-    const openedTabs: Window[] = []
-    const openedUrls: string[] = []
-    let blockedCount = 0
+  const openSelectedExternalTargets = async () => {
+    if (linkedVideos.length === 0 || (selectedExternalTargets.length === 0 && !includeOriginalUrl)) return
 
-    for (const video of linkedVideos) {
-      if (!video.url) continue
+    const linksByVideo = linkedVideos.map((video) => [
+      ...selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, video.videoCode)),
+      ...(includeOriginalUrl && video.url ? [video.url] : []),
+    ])
+    const links = linksByVideo.flat()
+    const openedTabs = links.map(() => {
       const tab = window.open('about:blank', '_blank')
-      if (!tab) {
-        blockedCount += 1
-        continue
-      }
+      if (!tab) return null
+      try { tab.opener = null } catch { /* Ignore browsers that prevent reassigning opener. */ }
+      return tab
+    })
 
-      try {
-        tab.opener = null
-      } catch {
-        // Ignore browsers that prevent reassigning opener.
-      }
-
-      openedTabs.push(tab)
-      openedIds.push(video.id)
-      openedUrls.push(video.url)
+    for (let index = 0; index < links.length; index += 1) {
+      if (openedTabs[index]) openedTabs[index].location.href = links[index]
+      if (index < links.length - 1) await new Promise((resolve) => window.setTimeout(resolve, EXTERNAL_LINK_DELAY_MS))
     }
+    void markVideosOpened(linkedVideos.map((video) => video.id))
+    const openedCount = openedTabs.filter(Boolean).length
+    if (openedCount < links.length) toast.warning(`Opened ${openedCount} of ${links.length} selected site links.`)
+  }
 
-    void markVideosOpened(openedIds)
-
-    if (openedTabs.length > 0) {
-      toast.info(
-        openedTabs.length === 1
-          ? 'Opening 1 scraper link.'
-          : `Opening ${openedTabs.length} scraper links, one every ${OPEN_ALL_LINK_DELAY_MS / 1000} seconds.`
-      )
-    }
-
-    for (let index = 0; index < openedTabs.length; index += 1) {
-      openedTabs[index].location.href = openedUrls[index]
-      if (index < openedTabs.length - 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, OPEN_ALL_LINK_DELAY_MS))
-      }
-    }
-
-    if (blockedCount > 0) {
-      toast.warning(
-        blockedCount === 1
-          ? '1 link was blocked by the browser.'
-          : `${blockedCount} links were blocked by the browser.`
-      )
-    }
-
-    if (openedIds.length === 0) {
-      if (linkedVideos.length === 0) {
-        toast.info('No links on this page.')
-      }
-      return
-    }
+  const toggleExternalTarget = (targetKey: string, checked: boolean) => {
+    setSelectedExternalTargetKeys((previous) => {
+      const next = new Set(previous)
+      if (checked) next.add(targetKey)
+      else next.delete(targetKey)
+      return next
+    })
   }
 
   return (
@@ -318,10 +304,39 @@ export function ScraperVideosDialog({
               <Filter className="h-4 w-4 mr-2" />
               Filter{filterCount > 0 ? ` (${filterCount})` : ''}
             </Button>
-            <Button type="button" variant="outline" onClick={() => void openAllLinks()} disabled={isFetching || linkedVideos.length === 0}>
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Open All
-            </Button>
+            {externalVideoTargets.length > 0 || linkedVideos.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" disabled={isFetching || linkedVideos.length === 0}>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open In
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-52">
+                  <DropdownMenuLabel>Select sites</DropdownMenuLabel>
+                  {linkedVideos.length > 0 ? (
+                    <DropdownMenuCheckboxItem checked={includeOriginalUrl} onCheckedChange={(checked) => setIncludeOriginalUrl(checked === true)} onSelect={(event) => event.preventDefault()}>
+                      Original URL
+                    </DropdownMenuCheckboxItem>
+                  ) : null}
+                  {externalVideoTargets.map((target) => (
+                    <DropdownMenuCheckboxItem key={target.label + target.url_template} checked={selectedExternalTargetKeys.has(target.label + target.url_template)} onCheckedChange={(checked) => toggleExternalTarget(target.label + target.url_template, checked === true)} onSelect={(event) => event.preventDefault()}>
+                      {target.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <div className="flex gap-1 px-1 pb-1">
+                    <Button type="button" size="sm" variant="secondary" className="h-8 flex-1 text-xs" onClick={() => { setIncludeOriginalUrl(true); setSelectedExternalTargetKeys(new Set(externalVideoTargets.map((target) => target.label + target.url_template))) }}>Select all</Button>
+                    <Button type="button" size="sm" variant="secondary" className="h-8 flex-1 text-xs" onClick={() => { setIncludeOriginalUrl(false); setSelectedExternalTargetKeys(new Set()) }}>Clear</Button>
+                  </div>
+                  <div className="px-1 pb-1">
+                    <Button type="button" size="sm" className="h-8 w-full text-xs" disabled={selectedExternalTargets.length === 0 && !includeOriginalUrl} onClick={() => void openSelectedExternalTargets()}>
+                      {includeOriginalUrl && selectedExternalTargets.length === 0 ? 'Open original URL' : `Open in ${selectedExternalTargets.length} selected ${selectedExternalTargets.length === 1 ? 'site' : 'sites'}${includeOriginalUrl ? ' + original URL' : ''}`}
+                    </Button>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
             <Button type="button" variant="outline" onClick={toggleAllTitlesExpanded} disabled={expandableVideos.length === 0}>
               {allExpandableTitlesExpanded ? (
                 <ChevronsDownUp className="h-4 w-4 mr-2" />

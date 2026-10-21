@@ -12,6 +12,8 @@ from .actress_work_file_state import mark_file_present
 from .deleted_file import record_deleted_file
 from ..schemas.file import FileRecord
 from ..utils import generate_filename_id
+from ..utils import extract_normalized_video_code
+from ..schemas.scene import SceneRecord
 
 
 class File:
@@ -69,6 +71,12 @@ class File:
         )
         self.db.add(file_metadata)
         mark_file_present(self.db, file_metadata)
+        video_code = extract_normalized_video_code(name) if file_type == "video" else None
+        if video_code:
+            self.db.query(SceneRecord).filter(
+                SceneRecord.file_id.is_(None),
+                SceneRecord.normalized_video_code == video_code,
+            ).update({SceneRecord.file_id: file_id}, synchronize_session=False)
         self.db.commit()
         self.db.refresh(file_metadata)
         return file_metadata

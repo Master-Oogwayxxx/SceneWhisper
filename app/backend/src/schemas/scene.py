@@ -9,7 +9,10 @@ class SceneRecord(Base):
     __tablename__ = "scenes"
 
     id = Column(String, primary_key=True, index=True)
-    file_id = Column(String, ForeignKey("files.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Nullable so generated scenes can survive deletion of the indexed file and
+    # be reattached when the same video code is indexed again.
+    file_id = Column(String, ForeignKey("files.id", ondelete="CASCADE"), nullable=True, index=True)
+    normalized_video_code = Column(String, nullable=True, index=True)
     scene_number = Column(Integer, nullable=False)  # 1-based index from PySceneDetect
     start_frame = Column(Integer, nullable=False)
     end_frame = Column(Integer, nullable=False)

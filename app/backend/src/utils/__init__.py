@@ -270,6 +270,14 @@ def generate_filename_id(filename: str, filepath: str = None) -> str:
     return hash_object.hexdigest()[:16]
 
 
+def extract_normalized_video_code(filename: str) -> str | None:
+    """Extract a stable JAV code from a filename for reusable scene cache rows."""
+    match = re.search(r"\b([A-Za-z]{2,8})[-_ ]?(\d{2,6})\b", Path(filename).stem)
+    if not match:
+        return None
+    return f"{match.group(1).upper()}-{int(match.group(2)):03d}"
+
+
 def is_subtitled(path: str) -> bool:
     video_name = Path(path).stem
 

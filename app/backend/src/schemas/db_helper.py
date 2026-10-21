@@ -220,6 +220,16 @@ def _ensure_file_filter_indexes() -> None:
         conn.commit()
 
 
+def _ensure_scene_cache_column() -> None:
+    """Add the stable video-code key used to retain scenes across file deletes."""
+    with engine.connect() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(scenes)"))}
+        if "normalized_video_code" not in cols:
+            conn.execute(text("ALTER TABLE scenes ADD COLUMN normalized_video_code TEXT"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_scenes_normalized_video_code ON scenes (normalized_video_code)"))
+            conn.commit()
+
+
 def _ensure_actress_work_file_state_table() -> None:
     """Create persistent local-file state table for actress works if absent."""
     with engine.connect() as conn:
@@ -879,6 +889,7 @@ def init_db():
     _ensure_stage_elapsed_columns()
     _ensure_queue_disabled_column()
     _ensure_file_is_deleted_column()
+    _ensure_scene_cache_column()
     _ensure_file_filter_indexes()
     _ensure_actress_work_file_state_table()
     _ensure_deleted_files_table()

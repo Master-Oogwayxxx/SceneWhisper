@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, aliased
 from ..api.tasks import task_manager
 from ..crud.actress_work_file_state import mark_file_present
 from ..crud.deleted_file import record_deleted_file
+from ..utils import extract_normalized_video_code
 from ..crud.directory import Directory
 from ..crud.file import File as FileCRUD
 from ..crud.task import delete_tasks_by_ids, get_task_ids_by_file_and_statuses, get_task_ids_by_file_statuses_and_types
@@ -1259,6 +1260,11 @@ async def delete_file(
     try:
         if delete_from_database:
             record_deleted_file(db, file_record, reason="manual_file_delete", source="file_api")
+            if file_record.file_type == "video":
+                db.query(SceneRecord).filter(SceneRecord.file_id == file_record.id).update(
+                    {SceneRecord.file_id: None, SceneRecord.normalized_video_code: extract_normalized_video_code(file_record.name)},
+                    synchronize_session=False,
+                )
             db.delete(file_record)
 
         if delete_from_disk:

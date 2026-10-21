@@ -21,7 +21,7 @@ from .notification_service import emit_notification
 from .schemas.db_helper import close_db, get_db
 from .schemas.file import FileRecord
 from .schemas.task import TaskRecord
-from .utils import _elapsed_seconds_since_start, _in_hour_window, _local_timezone, _seconds_until, _stage_elapsed_seconds, get_scenes, utc_isoformat
+from .utils import _elapsed_seconds_since_start, _in_hour_window, _local_timezone, _seconds_until, _stage_elapsed_seconds, extract_normalized_video_code, get_scenes, utc_isoformat
 
 _PROCESSING_DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 _NO_SCENES_ERROR = "Scene detection returned no scenes"
@@ -1631,6 +1631,7 @@ class TaskManager:
                                 [
                                     {
                                         "file_id": task.file.id,
+                                        "normalized_video_code": extract_normalized_video_code(task.file.name),
                                         "scene_number": i + 1,
                                         "start_frame": start_tc.get_frames(),
                                         "end_frame": end_tc.get_frames(),

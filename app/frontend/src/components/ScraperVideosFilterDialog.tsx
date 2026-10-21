@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ScraperVideoFilters } from '@/api/scraper'
@@ -89,7 +90,7 @@ export function ScraperVideosFilterDialog({
 
   const filterCount = activeScraperVideoFilterCount(draftFilters)
   const localMatchTraits = draftFilters.localMatchTraits ?? true
-  const localMatchResolution = draftFilters.localMatchResolution ?? false
+  const localMatchResolution = draftFilters.localMatchResolution ?? 'any'
 
   const clearFilters = () => {
     setDraftFilters({})
@@ -162,7 +163,11 @@ export function ScraperVideosFilterDialog({
                     <button
                       key={value}
                       type="button"
-                      onClick={() => setDraftFilters({ ...draftFilters, [control.key]: selectValueToFilter(value) })}
+                      onClick={() => setDraftFilters({
+                        ...draftFilters,
+                        [control.key]: selectValueToFilter(value),
+                        ...(control.key === 'fileExists' && value !== 'no' ? { localMatchResolution: null } : {}),
+                      })}
                       className={filterButtonClass(
                         value,
                         filterToSelectValue(draftFilters[control.key]),
@@ -174,7 +179,7 @@ export function ScraperVideosFilterDialog({
                   ))}
                 </div>
               </div>
-              {control.key === 'fileExists' && (
+              {control.key === 'fileExists' && draftFilters.fileExists === false && (
                 <div className="grid gap-1">
                   <div className="grid grid-cols-[96px_minmax(0,1fr)] items-center gap-3">
                     <span />
@@ -188,7 +193,7 @@ export function ScraperVideosFilterDialog({
                             </TooltipTrigger>
                             <TooltipContent side="right" className="max-w-72 text-xs leading-relaxed">
                               <p>
-                                When enabled, an uncensored scraped video only counts as local if the matching local file also is uncensored or reduced mosaic.
+                                When enabled, a scraped video that is uncensored, only counts as local if the matching local file is uncensored.
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -205,7 +210,7 @@ export function ScraperVideosFilterDialog({
                     <span />
                     <div className="flex h-8 items-center justify-between px-3 text-xs">
                       <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
-                        <span>Same Resolution Only</span>
+                        <span>Treat as Not Local</span>
                         <TooltipProvider delayDuration={150}>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -213,17 +218,31 @@ export function ScraperVideosFilterDialog({
                             </TooltipTrigger>
                             <TooltipContent side="right" className="max-w-72 text-xs leading-relaxed">
                               <p>
-                                When enabled, a scraped video with a resolution hint like 720p, 1080p, 1440p, or 4K only counts as local if the matching local file has the same resolution.
+                                Choose a local resolution range to treat as not local. For example, selecting 720p and below makes videos with local 480p or 720p files appear under Local: No.
                               </p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       </div>
-                      <Switch
-                        checked={localMatchResolution}
-                        onCheckedChange={(checked) => setDraftFilters({ ...draftFilters, localMatchResolution: checked })}
-                        aria-label="Require local files to match the scraped video resolution"
-                      />
+                      <Select
+                        value={localMatchResolution}
+                        onValueChange={(value) => setDraftFilters({
+                          ...draftFilters,
+                          localMatchResolution: value === 'any' ? null : value,
+                        })}
+                      >
+                        <SelectTrigger className="h-8 w-44 text-xs" aria-label="Local resolution match">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="any">Any resolution</SelectItem>
+                          <SelectItem value="480p">480p and below</SelectItem>
+                          <SelectItem value="720p">720p and below</SelectItem>
+                          <SelectItem value="1080p">1080p</SelectItem>
+                          <SelectItem value="1440p">1440p</SelectItem>
+                          <SelectItem value="4k">2160p / 4K</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>

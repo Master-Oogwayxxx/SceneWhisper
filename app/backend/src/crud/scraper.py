@@ -367,7 +367,7 @@ def list_videos(
     sort_dir: str = "desc",
     file_exists: bool | None = None,
     local_match_traits: bool = True,
-    local_match_resolution: bool = False,
+    local_match_resolution: str | None = None,
     uncensored: bool | None = None,
     censored: bool | None = None,
     subtitled: bool | None = None,
@@ -442,7 +442,7 @@ def _video_codes_on_disk_or_db(
     db,
     video_codes: list[tuple[str, bool, str | None]],
     local_match_traits: bool = True,
-    local_match_resolution: bool = False,
+    local_match_resolution: str | None = None,
 ) -> set[tuple[str, bool, str | None]]:
     code_traits = [(code, is_uncensored, resolution) for code, is_uncensored, resolution in dict.fromkeys(video_codes) if code]
     codes = [code for code in dict.fromkeys(code for code, _, _ in code_traits) if code]
@@ -463,10 +463,24 @@ def _video_codes_on_disk_or_db(
             if not is_deleted or (path and Path(path).exists()):
                 if local_match_traits and scraped_is_uncensored and not name_is_uncensored:
                     continue
-                if local_match_resolution and scraped_resolution and name_resolution != scraped_resolution:
+                if local_match_resolution and _resolution_matches_policy(name_resolution, local_match_resolution):
                     continue
                 found.add((code, scraped_is_uncensored, scraped_resolution))
     return found
+
+
+def _resolution_matches_policy(local_resolution: str | None, policy: str) -> bool:
+    if local_resolution is None:
+        return False
+    order = {"sd": 480, "720p": 720, "1080p": 1080, "1440p": 1440, "4k": 2160}
+    local_height = order.get(local_resolution)
+    if local_height is None:
+        return False
+    if policy == "480p":
+        return local_height <= 480
+    if policy == "720p":
+        return local_height <= 720
+    return local_resolution == policy
 
 
 def upsert_videos(source_id: str, source_url: str, videos: list[dict[str, str | bool | None]]) -> tuple[int, int]:

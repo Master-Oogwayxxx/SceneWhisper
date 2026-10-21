@@ -282,12 +282,14 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
       return
     }
 
-    const links = [
-      ...selectedVideoCodes.flatMap((videoCode) => (
-        selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, videoCode))
-      )),
-      ...(includeOriginalUrl ? selectedItems.map((item) => item.url) : []),
-    ]
+    const linksByVideo = selectedVideoCodes.map((videoCode) => {
+      const item = selectedItems.find((selectedItem) => selectedItem.videoCode === videoCode)
+      return [
+        ...selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, videoCode)),
+        ...(includeOriginalUrl && item ? [item.url] : []),
+      ]
+    })
+    const links = linksByVideo.flat()
     const openedTabs = links.map(() => {
       const tab = window.open('about:blank', '_blank')
       if (!tab) {
@@ -303,14 +305,18 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
       return tab
     })
 
-    for (let index = 0; index < openedTabs.length; index += 1) {
-      const tab = openedTabs[index]
-      if (tab) {
-        tab.location.href = links[index]
-      }
+    let linkIndex = 0
+    for (const videoLinks of linksByVideo) {
+      for (const link of videoLinks) {
+        const tab = openedTabs[linkIndex]
+        if (tab) {
+          tab.location.href = link
+        }
+        linkIndex += 1
 
-      if (index < openedTabs.length - 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, EXTERNAL_LINK_DELAY_MS))
+        if (linkIndex < links.length) {
+          await new Promise((resolve) => window.setTimeout(resolve, EXTERNAL_LINK_DELAY_MS))
+        }
       }
     }
     setOpenedVideoCodes((previous) => new Set([...previous, ...selectedVideoCodes]))

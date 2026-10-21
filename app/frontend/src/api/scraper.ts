@@ -5,7 +5,7 @@ import { API_BASE } from '@/api/client'
 export interface ScraperVideoFilters {
   fileExists?: boolean | null
   localMatchTraits?: boolean | null
-  localMatchResolution?: boolean | null
+  localMatchResolution?: string | null
   uncensored?: boolean | null
   censored?: boolean | null
   subtitled?: boolean | null

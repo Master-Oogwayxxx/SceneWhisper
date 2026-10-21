@@ -215,19 +215,24 @@ export function BookmarkVideoCheckTool({ onBack }: BookmarkVideoCheckToolProps) 
   const openSelectedBookmarks = async () => {
     if (selectedItems.length === 0 || (selectedExternalTargets.length === 0 && !includeOriginalUrl)) return
 
-    const links = selectedItems.flatMap((item) => [
+    const linksByItem = selectedItems.map((item) => [
       ...selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, item.videoCode)),
       ...(includeOriginalUrl ? [item.url] : []),
     ])
+    const links = linksByItem.flat()
     const openedTabs = links.map(() => {
       const tab = window.open('about:blank', '_blank')
       if (!tab) return null
       try { tab.opener = null } catch { /* Opening still works without reassignment. */ }
       return tab
     })
-    for (let index = 0; index < openedTabs.length; index += 1) {
-      if (openedTabs[index]) openedTabs[index]!.location.href = links[index]
-      if (index < openedTabs.length - 1) await new Promise((resolve) => window.setTimeout(resolve, 100))
+    let linkIndex = 0
+    for (const itemLinks of linksByItem) {
+      for (const link of itemLinks) {
+        if (openedTabs[linkIndex]) openedTabs[linkIndex]!.location.href = link
+        linkIndex += 1
+        if (linkIndex < links.length) await new Promise((resolve) => window.setTimeout(resolve, 100))
+      }
     }
     const openedCount = openedTabs.filter((tab) => tab !== null).length
     if (openedCount < links.length) toast.error(`Opened ${openedCount} of ${links.length} selected site link${links.length === 1 ? '' : 's'}`)

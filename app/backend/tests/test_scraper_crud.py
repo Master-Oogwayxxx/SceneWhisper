@@ -386,7 +386,7 @@ def test_list_videos_can_disable_trait_aware_local_matching(monkeypatch):
     assert videos == []
 
 
-def test_list_videos_can_require_matching_local_resolution(monkeypatch):
+def test_list_videos_can_treat_low_resolution_local_files_as_not_local(monkeypatch):
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
@@ -429,7 +429,7 @@ def test_list_videos_can_require_matching_local_resolution(monkeypatch):
     videos, total = scraper_crud.list_videos(
         "source-1",
         file_exists=False,
-        local_match_resolution=True,
+        local_match_resolution="720p",
     )
 
     assert total == 1

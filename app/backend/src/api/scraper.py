@@ -117,7 +117,7 @@ async def list_videos(
     sort_dir: str = Query(default="desc", pattern="^(asc|desc)$"),
     file_exists: bool | None = Query(default=None),
     local_match_traits: bool = Query(default=True),
-    local_match_resolution: bool = Query(default=False),
+    local_match_resolution: str | None = Query(default=None, pattern="^(480p|720p|1080p|1440p|4k)$"),
     uncensored: bool | None = Query(default=None),
     censored: bool | None = Query(default=None),
     subtitled: bool | None = Query(default=None),

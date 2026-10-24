@@ -120,9 +120,10 @@ describe('handleCreateMonitors - nextRun not computed client-side', () => {
 describe('handleBulkRunNow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.spyOn(directoryApi, 'getDirectoryMonitors').mockResolvedValue([])
   })
 
-  it('passes { silent: true } option to each handleRunMonitorNow call', async () => {
+  it('runs each selected monitor and refreshes once after the batch', async () => {
     const monitor1: DirectoryMonitor = {
       ...mockMonitor,
       id: 'monitor-1',
@@ -138,8 +139,9 @@ describe('handleBulkRunNow', () => {
       .mockResolvedValueOnce({ queued: 5, skipped: 2 })
       .mockResolvedValueOnce({ queued: 3, skipped: 1 })
 
+    const fetchStats = vi.fn()
     const { result } = renderHook(
-      () => useMonitorActions(vi.fn(), vi.fn(), vi.fn()),
+      () => useMonitorActions(vi.fn(), vi.fn(), fetchStats),
       {
         initialProps: undefined,
       },
@@ -155,6 +157,41 @@ describe('handleBulkRunNow', () => {
     await result.current.handleBulkRunNow(['monitor-1', 'monitor-2'])
 
     expect(directoryApi.runMonitorNow).toHaveBeenCalledTimes(2)
+    expect(directoryApi.getDirectoryMonitors).toHaveBeenCalledOnce()
+    expect(fetchStats).toHaveBeenCalledOnce()
+  })
+
+  it('limits concurrent monitor runs to four', async () => {
+    const monitors = Array.from({ length: 10 }, (_, index): DirectoryMonitor => ({
+      ...mockMonitor,
+      id: `monitor-${index}`,
+      directoryPath: `/path/${index}`,
+    }))
+    let active = 0
+    let maxActive = 0
+    const releases: Array<() => void> = []
+    vi.spyOn(directoryApi, 'runMonitorNow').mockImplementation(async () => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      await new Promise<void>((resolve) => releases.push(resolve))
+      active -= 1
+      return { queued: 1, skipped: 0 }
+    })
+
+    const { result } = renderHook(() => useMonitorActions(vi.fn(), vi.fn(), vi.fn()))
+    result.current.setMonitors(monitors)
+    await waitFor(() => expect(result.current.monitors).toHaveLength(10))
+
+    const run = result.current.handleBulkRunNow(monitors.map((monitor) => monitor.id))
+    await waitFor(() => expect(directoryApi.runMonitorNow).toHaveBeenCalledTimes(4))
+    while (releases.length > 0 || active > 0) {
+      releases.splice(0).forEach((release) => release())
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    await run
+
+    expect(directoryApi.runMonitorNow).toHaveBeenCalledTimes(10)
+    expect(maxActive).toBe(4)
   })
 
   it('does not run disabled selected monitors', async () => {

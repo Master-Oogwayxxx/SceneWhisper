@@ -194,7 +194,7 @@ export const useMonitorActions = (
   }
 
   /**
-   * Run all selected monitors sequentially with progress tracking.
+   * Run selected monitors with bounded concurrency and progress tracking.
    * @param ids Array of monitor IDs to run
    * @param onProgress Optional callback invoked after each monitor completes
    *   - done: number of monitors completed so far
@@ -213,16 +213,36 @@ export const useMonitorActions = (
       .filter((m): m is DirectoryMonitor => m !== undefined && m.isActive)
     let totalQueued = 0
     let totalSkipped = 0
-    for (let i = 0; i < targets.length; i++) {
-      if (shouldCancel?.()) break
-      try {
-        const result = await handleRunMonitorNow(targets[i].directoryPath, { silent: true })
-        totalQueued += result.queued
-        totalSkipped += result.skipped
-      } catch (err) {
-        console.error(`Failed to run monitor ${targets[i].directoryPath}:`, err)
+    let completed = 0
+    let nextIndex = 0
+
+    const runNext = async () => {
+      while (!shouldCancel?.()) {
+        const index = nextIndex
+        nextIndex += 1
+        if (index >= targets.length) return
+
+        const monitor = targets[index]
+        try {
+          const result = await directoryApi.runMonitorNow(monitor.id)
+          totalQueued += result.queued
+          totalSkipped += result.skipped
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Unknown error'
+          console.error(`Failed to run monitor ${monitor.directoryPath}:`, err)
+          toast.error(`Monitor run failed for ${monitor.directoryName}: ${message}`)
+        }
+        completed += 1
+        onProgress?.(completed, targets.length, totalQueued, totalSkipped)
       }
-      onProgress?.(i + 1, targets.length, totalQueued, totalSkipped)
+    }
+
+    const workerCount = Math.min(4, targets.length)
+    await Promise.all(Array.from({ length: workerCount }, () => runNext()))
+
+    if (targets.length > 0) {
+      fetchStats()
+      await fetchMonitors()
     }
     if (targets.length > 0 && (totalQueued > 0 || totalSkipped > 0)) {
       toast.success(`Scanning complete: ${totalQueued} queued, ${totalSkipped} skipped`)

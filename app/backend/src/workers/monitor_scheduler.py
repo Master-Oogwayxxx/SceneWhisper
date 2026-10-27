@@ -259,8 +259,6 @@ def _load_video_candidates(
             video_path = os.path.join(root, filename)
             if task_type in (TaskType.SPLIT, TaskType.ALL) and not _matches_split_scope(video_path, split_scope):
                 continue
-            if task_type in (TaskType.ANALYZE_FRAME_PACING, TaskType.NVENC_FRAME_PACING) and frame_pacing_scope == "split" and not is_pyscenedetect_split(Path(video_path)):
-                continue
             all_paths.append(video_path)
 
     if not all_paths:
@@ -349,6 +347,14 @@ def _load_video_candidates(
         frame_pacing_done_ids: set[str] = set()
         frame_pacing_resolution_ids: set[str] | None = None
         frame_pacing_4k_ids: set[str] = set()
+        frame_pacing_split_ids: set[str] = set()
+        if task_type in (TaskType.ANALYZE_FRAME_PACING, TaskType.NVENC_FRAME_PACING) and frame_pacing_scope == "split":
+            frame_pacing_split_ids = _bulk(
+                lambda ids: {r.id for r in db.query(FileRecord.id).filter(
+                    FileRecord.id.in_(ids),
+                    FileRecord.parent_id.isnot(None),
+                ).all()}
+            )
         if task_type in (TaskType.SPLIT, TaskType.ALL, TaskType.ANALYZE_FRAME_PACING, TaskType.NVENC_FRAME_PACING) and selected_frame_pacing_resolutions:
             def _resolution_bucket(width: int | None, height: int | None) -> str | None:
                 if width is None and height is None:
@@ -408,6 +414,13 @@ def _load_video_candidates(
             reason = "active task already queued or processing"
         elif file_id in failed_ids:
             reason = "previously failed or cancelled"
+        elif (
+            task_type in (TaskType.ANALYZE_FRAME_PACING, TaskType.NVENC_FRAME_PACING)
+            and frame_pacing_scope == "split"
+            and file_id not in frame_pacing_split_ids
+            and not is_pyscenedetect_split(path)
+        ):
+            reason = "not a split video"
         elif file_id in frame_pacing_done_ids:
             reason = "frame pacing already completed"
         elif file_id in frame_pacing_4k_ids:

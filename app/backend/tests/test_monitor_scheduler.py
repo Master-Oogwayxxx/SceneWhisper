@@ -32,7 +32,8 @@ def test_matches_split_scope(filename, scope, expected):
     assert _matches_split_scope(filename, scope) is expected
 
 
-def test_load_video_candidates_filters_frame_pacing_to_split_videos(tmp_path, monkeypatch):
+@pytest.mark.parametrize("task_type", [TaskType.ANALYZE_FRAME_PACING, TaskType.NVENC_FRAME_PACING])
+def test_load_video_candidates_filters_frame_pacing_to_split_videos(tmp_path, monkeypatch, task_type):
     db_path = tmp_path / "frame-pacing-scope.db"
     engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
     monkeypatch.setattr(dbh, "engine", engine)
@@ -46,13 +47,74 @@ def test_load_video_candidates_filters_frame_pacing_to_split_videos(tmp_path, mo
 
     to_queue, skipped_paths, skip_reasons = _load_video_candidates(
         str(tmp_path),
-        TaskType.NVENC_FRAME_PACING,
+        task_type,
         frame_pacing_scope="split",
     )
 
     assert to_queue == [str(split)]
-    assert skipped_paths == []
-    assert skip_reasons == []
+    assert skipped_paths == [str(original)]
+    assert skip_reasons == ["not a split video"]
+
+
+@pytest.mark.parametrize("task_type", [TaskType.ANALYZE_FRAME_PACING, TaskType.NVENC_FRAME_PACING])
+def test_load_video_candidates_uses_file_parent_for_frame_pacing_split_scope(tmp_path, monkeypatch, task_type):
+    db_path = tmp_path / "frame-pacing-db-split-scope.db"
+    engine = create_engine(f"sqlite:///{db_path}", connect_args={"check_same_thread": False})
+    monkeypatch.setattr(dbh, "engine", engine)
+    monkeypatch.setattr(dbh, "SessionLocal", sessionmaker(autocommit=False, autoflush=False, bind=engine))
+    dbh.init_db()
+
+    original = tmp_path / "ABC-123.mp4"
+    split = tmp_path / "ABC-123-part-a.mp4"
+    original.write_bytes(b"video")
+    split.write_bytes(b"video")
+
+    ids_by_name = {
+        original.name: "original-file",
+        split.name: "split-file",
+    }
+    db = dbh.SessionLocal()
+    try:
+        db.add_all(
+            [
+                FileRecord(
+                    id="original-file",
+                    name=original.name,
+                    path=str(original),
+                    size=123,
+                    file_type="video",
+                    format="mp4",
+                    directory_id="dir-1",
+                ),
+                FileRecord(
+                    id="split-file",
+                    parent_id="original-file",
+                    name=split.name,
+                    path=str(split),
+                    size=123,
+                    file_type="video",
+                    format="mp4",
+                    directory_id="dir-1",
+                ),
+            ]
+        )
+        db.commit()
+    finally:
+        close_db(db)
+
+    def fake_generate_filename_id(filename, _path):
+        return ids_by_name[filename]
+
+    with patch("src.workers.monitor_scheduler.generate_filename_id", side_effect=fake_generate_filename_id):
+        to_queue, skipped_paths, skip_reasons = _load_video_candidates(
+            str(tmp_path),
+            task_type,
+            frame_pacing_scope="split",
+        )
+
+    assert to_queue == [str(split)]
+    assert skipped_paths == [str(original)]
+    assert skip_reasons == ["not a split video"]
 
 
 @pytest.mark.parametrize("task_type", [TaskType.ANALYZE_FRAME_PACING, TaskType.NVENC_FRAME_PACING])

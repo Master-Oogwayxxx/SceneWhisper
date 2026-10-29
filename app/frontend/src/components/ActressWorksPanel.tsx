@@ -344,9 +344,10 @@ export function ActressWorksPanel({
   useEffect(() => { setInputValue(search) }, [search])
 
   useEffect(() => {
+    if (inputValue === search) return
     const timer = setTimeout(() => { onSearchChange(inputValue) }, 700)
     return () => clearTimeout(timer)
-  }, [inputValue])
+  }, [inputValue, onSearchChange, search])
 
   useEffect(() => {
     const syncExpandedActions = () => setShowExpandedActions(window.innerWidth > EXPANDED_ACTIONS_MIN_WIDTH)

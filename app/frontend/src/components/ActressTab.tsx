@@ -357,15 +357,37 @@ interface ActressTabProps {
 }
 
 export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
+  const selectedActressQueryKey = 'actress'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [searchDraft, setSearchDraft] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [page, setPage] = useState(0)
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [worksPage, setWorksPage] = useState(0)
-  const [worksPageSize, setWorksPageSize] = useState(() => window.innerWidth >= 1921 ? 50 : 25)
-  const [worksSortBy, setWorksSortBy] = useState('date')
-  const [worksSortDir, setWorksSortDir] = useState('desc')
+  const [page, setPage] = useState(() => {
+    const value = Number(new URLSearchParams(window.location.search).get('page'))
+    return Number.isInteger(value) && value >= 0 ? value : 0
+  })
+  const [selectedId, setSelectedId] = useState<number | null>(() => {
+    const queryId = new URLSearchParams(window.location.search).get(selectedActressQueryKey)
+    if (!queryId) return null
+    const parsedId = Number(queryId)
+    return Number.isInteger(parsedId) ? parsedId : null
+  })
+  const [worksPage, setWorksPage] = useState(() => {
+    const value = Number(new URLSearchParams(window.location.search).get('worksPage'))
+    return Number.isInteger(value) && value >= 1 ? value - 1 : 0
+  })
+  const [worksPageSize, setWorksPageSize] = useState(() => {
+    const value = Number(new URLSearchParams(window.location.search).get('worksPageSize'))
+    return [10, 15, 25, 50, 100, 250, 500, 1000].includes(value)
+      ? value
+      : window.innerWidth >= 1921 ? 50 : 25
+  })
+  const [worksSortBy, setWorksSortBy] = useState(() => {
+    const value = new URLSearchParams(window.location.search).get('worksSort')
+    return value === 'id' || value === 'title' || value === 'date' ? value : 'date'
+  })
+  const [worksSortDir, setWorksSortDir] = useState(() => (
+    new URLSearchParams(window.location.search).get('worksDir') === 'asc' ? 'asc' : 'desc'
+  ))
   const [worksSearch, setWorksSearch] = useState('')
   const [worksFilter, setWorksFilter] = useState<ActressWorksFilterState>(EMPTY_ACTRESS_WORKS_FILTER_STATE)
   const [worksFilterDraft, setWorksFilterDraft] = useState<ActressWorksFilterState>(EMPTY_ACTRESS_WORKS_FILTER_STATE)
@@ -381,7 +403,9 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
   const [favoriteIds, setFavoriteIds] = useState<number[]>([])
   const [favoriteActresses, setFavoriteActresses] = useState<ActressSummary[]>([])
   const [favoriteActressesLoading, setFavoriteActressesLoading] = useState(false)
-  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [favoritesOnly, setFavoritesOnly] = useState(() => (
+    new URLSearchParams(window.location.search).get('favorites') === '1'
+  ))
   const [actressMonitors, setActressMonitors] = useState<ActressDownloadMonitor[]>([])
   const [schedulesDialogOpen, setSchedulesDialogOpen] = useState(false)
   const [scheduleEditorOpen, setScheduleEditorOpen] = useState(false)
@@ -785,8 +809,19 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
   }, [])
 
   useEffect(() => {
-    setWorksPage(0)
-  }, [selectedId])
+    const url = new URL(window.location.href)
+    if (selectedId === null) url.searchParams.delete(selectedActressQueryKey)
+    else url.searchParams.set(selectedActressQueryKey, String(selectedId))
+    if (favoritesOnly) url.searchParams.set('favorites', '1')
+    else url.searchParams.delete('favorites')
+    if (page > 0) url.searchParams.set('page', String(page))
+    else url.searchParams.delete('page')
+    url.searchParams.set('worksPage', String(worksPage + 1))
+    url.searchParams.set('worksPageSize', String(worksPageSize))
+    url.searchParams.set('worksSort', worksSortBy)
+    url.searchParams.set('worksDir', worksSortDir)
+    window.history.replaceState(window.history.state, '', url)
+  }, [favoritesOnly, page, selectedId, worksPage, worksPageSize, worksSortBy, worksSortDir])
 
   useEffect(() => {
     clearSelectedWorks()

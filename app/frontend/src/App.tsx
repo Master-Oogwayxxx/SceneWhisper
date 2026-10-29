@@ -46,6 +46,13 @@ function AppContent() {
     if (tab !== 'files' && tab !== 'tasks' && tab !== 'monitors') {
       const params = new URLSearchParams()
       params.set(TAB_QUERY_PARAM, tab)
+      if (tab === 'actresses') {
+        const existingParams = url.searchParams
+        for (const key of ['actress', 'favorites', 'page', 'worksPage', 'worksPageSize', 'worksSort', 'worksDir']) {
+          const value = existingParams.get(key)
+          if (value !== null) params.set(key, value)
+        }
+      }
       url.search = params.toString()
       window.history.replaceState(window.history.state, '', url)
       return

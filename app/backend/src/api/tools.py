@@ -183,10 +183,6 @@ def _translate_japanese_to_english(value: str) -> str:
 
 def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
     stem, extension = os.path.splitext(name)
-    if options.remove_first_n or options.remove_last_n:
-        start = max(0, options.remove_first_n)
-        end = len(stem) - max(0, options.remove_last_n) if options.remove_last_n else len(stem)
-        stem = stem[start:end] if end > start else ""
     if options.find_text:
         stem = stem.replace(options.find_text, options.replace_text)
     if options.remove_dates:
@@ -234,6 +230,10 @@ def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
         stem = stem.capitalize()
     elif options.case_conversion == "lower":
         stem = stem.lower()
+    if options.remove_first_n or options.remove_last_n:
+        start = max(0, options.remove_first_n)
+        end = len(stem) - max(0, options.remove_last_n) if options.remove_last_n else len(stem)
+        stem = stem[start:end] if end > start else ""
     if not stem:
         return name
     return f"{stem}{extension}"

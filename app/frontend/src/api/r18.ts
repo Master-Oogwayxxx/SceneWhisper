@@ -185,11 +185,11 @@ export const r18Api = {
     return res.json()
   },
 
-  async markActressWorkOpened(contentId: string): Promise<void> {
+  async markActressWorkOpened(contentId: string, site: string): Promise<void> {
     const res = await fetch(`${API_BASE}/r18/works/opened`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content_id: contentId }),
+      body: JSON.stringify({ content_id: contentId, site }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
@@ -197,11 +197,11 @@ export const r18Api = {
     }
   },
 
-  async markActressWorksOpened(contentIds: string[]): Promise<void> {
+  async markActressWorksOpened(contentIds: string[], sites: string[] = []): Promise<void> {
     const res = await fetch(`${API_BASE}/r18/works/opened/bulk`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content_ids: contentIds }),
+      body: JSON.stringify({ content_ids: contentIds, sites }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))

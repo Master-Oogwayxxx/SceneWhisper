@@ -686,6 +686,8 @@ def _ensure_actress_work_state_table() -> None:
             """
             )
         )
+        if "opened_sites" not in {column["name"] for column in inspect(engine).get_columns("actress_work_state")}:
+            conn.execute(text("ALTER TABLE actress_work_state ADD COLUMN opened_sites TEXT NOT NULL DEFAULT '[]'"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_actress_work_state_content_id ON actress_work_state (content_id)"))
         conn.commit()
         logging.info("Migration: ensured actress_work_state table exists")

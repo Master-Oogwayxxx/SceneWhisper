@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useSettings } from '@/hooks/useSettings'
 import { buildExternalVideoTargetUrl, isValidExternalVideoTarget } from '@/lib/external-video-targets'
@@ -28,6 +29,7 @@ interface HtmlPageVideoCheckToolProps {
 }
 
 type VideoContentKind = 'censored' | 'uncensored'
+type KindFilter = 'all' | VideoContentKind
 
 const EXTERNAL_LINK_DELAY_MS = 100
 
@@ -41,6 +43,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
   const [sourceLabel, setSourceLabel] = useState('')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
+  const [kind, setKind] = useState<KindFilter>('all')
   const [hasChecked, setHasChecked] = useState(false)
   const [isChecking, setIsChecking] = useState(false)
   const [isPasteOpen, setIsPasteOpen] = useState(false)
@@ -59,6 +62,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
     return items.filter((item) => {
       if (hasChecked && status === 'exists' && !item.fileExists) return false
       if (hasChecked && status === 'missing' && item.fileExists) return false
+      if (kind !== 'all' && getVideoContentKind(item.title) !== kind) return false
       if (!query) return true
       return (
         item.videoCode.toLowerCase().includes(query) ||
@@ -66,7 +70,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
         item.url.toLowerCase().includes(query)
       )
     })
-  }, [hasChecked, items, search, status])
+  }, [hasChecked, items, kind, search, status])
 
   const existingCount = items.filter((item) => item.fileExists).length
   const statusCounts = {
@@ -417,6 +421,16 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
               </Button>
             ))}
           </div>
+          <Select value={kind} onValueChange={(value) => setKind(value as KindFilter)}>
+            <SelectTrigger className="h-8 w-full text-xs sm:w-36" aria-label="Filter by kind">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Kind: Any</SelectItem>
+              <SelectItem value="uncensored">Uncensored</SelectItem>
+              <SelectItem value="censored">Censored</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="relative min-w-0 sm:w-72">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search page links" className="h-8 pl-9 text-sm" />

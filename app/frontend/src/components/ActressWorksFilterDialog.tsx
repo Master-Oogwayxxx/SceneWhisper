@@ -36,6 +36,7 @@ interface Props {
   onDraftChange: (patch: Partial<ActressWorksFilterState>) => void
   onApply: () => void
   onReset: () => void
+  openedSiteOptions: string[]
 }
 
 function TriStateControl({
@@ -83,6 +84,7 @@ export function ActressWorksFilterDialog({
   onDraftChange,
   onApply,
   onReset,
+  openedSiteOptions,
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -180,6 +182,16 @@ export function ActressWorksFilterDialog({
                 <TriStateControl label="Censored" value={draft.censored} onChange={(v) => onDraftChange({ censored: v })} />
                 <TriStateControl label="Subtitled" value={draft.subtitled} onChange={(v) => onDraftChange({ subtitled: v })} />
                 <TriStateControl label="Opened" value={draft.opened} onChange={(v) => onDraftChange({ opened: v })} />
+                <div className="flex items-center gap-3">
+                  <span className="w-24 shrink-0 text-sm text-muted-foreground">Site</span>
+                  <Select value={draft.openedSite ?? 'all'} onValueChange={(v) => onDraftChange({ openedSite: v === 'all' ? null : v })}>
+                    <SelectTrigger className="h-9 flex-1 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All sites</SelectItem>
+                      {openedSiteOptions.map((site) => <SelectItem key={site} value={site}>{site}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </div>

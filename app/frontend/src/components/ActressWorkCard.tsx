@@ -95,7 +95,7 @@ export const ActressWorkCard = ({ work, actressName, defaultSavePath, showCover 
   const [videoInfoOpen, setVideoInfoOpen] = useState(false)
   const [torrentInfoOpen, setTorrentInfoOpen] = useState(false)
   const [titleCopied, setTitleCopied] = useState(false)
-  const [hasBeenOpened, setHasBeenOpened] = useState(work.is_opened ?? false)
+  const [openedSites, setOpenedSites] = useState<string[]>(work.opened_sites ?? [])
   const qbitQueuedStates = new Set(['queuedDL', 'metaDL', 'stalledDL', 'checkingDL', 'checkingResumeData', 'pausedDL', 'stoppedDL'])
   const isAwaitingQbitMatch = Boolean(
     downloadStatus &&
@@ -115,8 +115,8 @@ export const ActressWorkCard = ({ work, actressName, defaultSavePath, showCover 
   const isStalledInQbit = downloadStatus?.state === 'stalledDL'
 
   useEffect(() => {
-    setHasBeenOpened(work.is_opened ?? false)
-  }, [work.content_id, work.is_opened])
+    setOpenedSites(work.opened_sites ?? [])
+  }, [work.content_id, work.opened_sites])
 
   const shouldShowDownloadProgress = Boolean(
     downloadStatus?.status === 'downloading' &&
@@ -179,19 +179,19 @@ export const ActressWorkCard = ({ work, actressName, defaultSavePath, showCover 
     ['File state', fileDeleted ? 'Deleted from disk' : fileExists ? 'Found on disk' : 'Not found on disk'],
     ['Uncensored', isUncensored ? 'Yes' : 'No'],
     ['Subtitled', isSubtitled ? 'Yes' : 'No'],
-    ['Opened', hasBeenOpened ? 'Yes' : 'No'],
+    ['Opened sites', openedSites.length ? openedSites.join(', ') : 'None'],
     ['Image URL', work.image_url],
   ]
 
-  const handleOpenExternalVideoTarget = (urlTemplate: string) => {
+  const handleOpenExternalVideoTarget = (label: string, urlTemplate: string) => {
     if (!formattedId) return
-    persistOpenedState()
+    persistOpenedState(label)
     window.open(buildExternalVideoTargetUrl({ label: '', url_template: urlTemplate }, formattedId, actressName ?? ''), '_blank', 'noopener,noreferrer')
   }
 
   const openExternalVideoTargetsConsecutively = async () => {
     if (!formattedId) return
-    persistOpenedState()
+    externalVideoTargets.forEach((target) => persistOpenedState(target.label))
 
     const openedTabs: Window[] = []
 
@@ -237,10 +237,10 @@ export const ActressWorkCard = ({ work, actressName, defaultSavePath, showCover 
     action()
   }
 
-  const persistOpenedState = () => {
-    if (hasBeenOpened) return
-    setHasBeenOpened(true)
-    void r18Api.markActressWorkOpened(work.content_id)
+  const persistOpenedState = (site: string) => {
+    const sites = site.split(', ').filter(Boolean)
+    setOpenedSites((current) => [...new Set([...current, ...sites])])
+    void r18Api.markActressWorkOpened(work.content_id, site)
       .then(() => {
         void queryClient.invalidateQueries({ queryKey: r18Keys.all() })
       })
@@ -302,7 +302,7 @@ export const ActressWorkCard = ({ work, actressName, defaultSavePath, showCover 
             {externalVideoTargets.map((target) => (
               <Item
                 key={target.label + target.url_template}
-                onSelect={(event) => handleMenuAction(event, () => handleOpenExternalVideoTarget(target.url_template))}
+                onSelect={(event) => handleMenuAction(event, () => handleOpenExternalVideoTarget(target.label, target.url_template))}
               >
                 {target.label}
               </Item>
@@ -509,17 +509,17 @@ export const ActressWorkCard = ({ work, actressName, defaultSavePath, showCover 
               </p>
             </>
           )}
-          {(hasBeenOpened || queueItem || downloadStatus?.status === 'completed' || downloadStatus?.status === 'error' || ((fileExists || fileDeleted || isUncensored || isCensored || isSubtitled || resolutionLabel) && !showCover)) && (
+          {(openedSites.length > 0 || queueItem || downloadStatus?.status === 'completed' || downloadStatus?.status === 'error' || ((fileExists || fileDeleted || isUncensored || isCensored || isSubtitled || resolutionLabel) && !showCover)) && (
             <div className="flex flex-1 items-center gap-1.5">
-              {hasBeenOpened && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="secondary" className="h-5 w-5 justify-center p-0" aria-label="Opened">
-                      <Eye className="h-4 w-4 text-white" />
+              {openedSites.length > 0 && (
+                <div className="flex min-w-0 flex-wrap items-center gap-1" aria-label={`Opened on ${openedSites.join(', ')}`}>
+                  <Eye className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  {openedSites.map((site) => (
+                    <Badge key={site} variant="secondary" className="max-w-full truncate px-1.5 text-[10px]" title={site}>
+                      {site}
                     </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Opened</TooltipContent>
-                </Tooltip>
+                  ))}
+                </div>
               )}
               {queueItem?.status === 'skipped' && (
                 <Tooltip>

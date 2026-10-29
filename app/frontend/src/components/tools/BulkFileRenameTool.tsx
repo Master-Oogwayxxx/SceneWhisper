@@ -114,13 +114,6 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   const preview = async (optionsOverride?: BulkRenameOptions, selectionOverride?: string[], includeAll = false) => {
     const requestId = ++previewRequestIdRef.current
     const previousSelection = new Set(selectionOverride ?? selectedFileIds)
-    if (!includeAll && !previousSelection.size && items.length) {
-      setItems((current) => current.map((item) => ({ ...item, newName: item.originalName })))
-      setBusy(false)
-      setPreviewing(false)
-      setPreviewingFileIds([])
-      return
-    }
     setBusy(true)
     setPreviewing(true)
     setPreviewingFileIds(Array.from(previousSelection))

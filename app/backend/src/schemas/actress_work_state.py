@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String
+from sqlalchemy import Boolean, Column, Integer, String, Text
 
 from .db_helper import Base
 
@@ -9,3 +9,4 @@ class ActressWorkStateRecord(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     content_id = Column(String, unique=True, nullable=False, index=True)
     is_opened = Column(Boolean, nullable=False, default=False)
+    opened_sites = Column(Text, nullable=False, default="[]")

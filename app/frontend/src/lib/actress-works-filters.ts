@@ -28,6 +28,7 @@ export interface ActressWorksFilterState {
   subtitled: boolean | null
   resolution: ActressWorkResolutionFilter | null
   opened: boolean | null     // null = no filter; true = opened; false = not opened
+  openedSite: string | null
   releaseYear: number | null // null = no filter; 4-digit year otherwise
   torrentStatus: ActressWorkTorrentStatusFilter | null
 }
@@ -40,12 +41,18 @@ export const EMPTY_ACTRESS_WORKS_FILTER_STATE: ActressWorksFilterState = {
   subtitled: null,
   resolution: null,
   opened: null,
+  openedSite: null,
   releaseYear: null,
   torrentStatus: null,
 }
 
 export function isActressWorksFilterActive(f: ActressWorksFilterState): boolean {
-  return f.fileExists !== null || f.localFileStatus !== null || f.uncensored !== null || f.censored !== null || f.subtitled !== null || f.resolution !== null || f.opened !== null || f.releaseYear !== null || f.torrentStatus !== null
+  return f.fileExists !== null || f.localFileStatus !== null || f.uncensored !== null || f.censored !== null || f.subtitled !== null || f.resolution !== null || f.opened !== null || f.openedSite !== null || f.releaseYear !== null || f.torrentStatus !== null
+}
+
+export function filterActressWorksByOpenedSite(works: ActressWork[], site: string | null): ActressWork[] {
+  if (site === null) return works
+  return works.filter((work) => work.opened_sites?.includes(site) ?? false)
 }
 
 const QBIT_QUEUED_STATES = new Set([

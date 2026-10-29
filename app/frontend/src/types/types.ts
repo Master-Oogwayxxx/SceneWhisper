@@ -642,6 +642,7 @@ export interface ActressWork {
   resolution?: 'sd' | '720p' | '1080p' | '1440p' | '4k' | null
   local_file_state?: 'present' | 'deleted' | null
   is_opened?: boolean
+  opened_sites?: string[]
 }
 
 export interface ActressDetail extends ActressSummary {

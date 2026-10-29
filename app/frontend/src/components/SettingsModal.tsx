@@ -19,7 +19,7 @@ import { Slider } from '@/components/ui/slider'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { Loader2, Trash2, ScanSearch, FolderSearch, Database, ChevronUp, ChevronDown, Plus, RotateCcw } from 'lucide-react'
+import { Loader2, Trash2, ScanSearch, FolderSearch, Database, ChevronUp, ChevronDown, Maximize2, Minimize2, Plus, RotateCcw } from 'lucide-react'
 import { AppSettings, TaskStatus, DirectoryRecord } from '@/types/types'
 import { SelectiveScanDialog } from '@/components/SelectiveScanDialog'
 import { SelectiveCleanupDialog } from '@/components/SelectiveCleanupDialog'
@@ -66,13 +66,13 @@ const LANGUAGES = [
 ]
 
 const DEFAULT_EXTERNAL_VIDEO_TARGET = {
-  label: 'Google',
-  url_template: 'https://www.google.com/search?q={videoCode}',
+  label: '',
+  url_template: '',
 }
 
 const DEFAULT_SCRAPER_TEMPLATE = {
-  label: 'JavPlayer',
-  url_template: 'https://javplayer.org/model/{actress_name}',
+  label: '',
+  url_template: '',
 }
 
 type ProcessingDayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
@@ -332,6 +332,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const srtCleanupEventSourceRef = useRef<EventSource | null>(null)
   const [externalVideoTargetsDraft, setExternalVideoTargetsDraft] = useState(() => settings.external_video_targets)
   const [scraperTemplatesDraft, setScraperTemplatesDraft] = useState(() => settings.scraper_templates)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Local state for editing processing hours (in user's timezone)
   const [localProcessingWindows, setLocalProcessingWindows] = useState(() => processingWindowsToLocal(settings))
@@ -856,9 +857,20 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => { if (!next && isBusy) return; onOpenChange(next) }}>
-        <DialogContent className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col overflow-hidden rounded-none sm:h-auto sm:max-h-[95vh] sm:w-full sm:max-w-xl sm:rounded-lg">
-          <DialogHeader>
+        <DialogContent className={`flex flex-col overflow-hidden ${isFullscreen ? 'h-[100dvh] max-h-[100dvh] w-screen max-w-none rounded-none' : 'h-[100dvh] max-h-[100dvh] w-screen max-w-none rounded-none sm:h-auto sm:max-h-[95vh] sm:w-full sm:max-w-xl sm:rounded-lg'}`}>
+          <DialogHeader className="flex flex-row items-center">
             <DialogTitle className="text-base sm:text-lg">Settings</DialogTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-12 top-2.5 h-4 w-4 p-0"
+              onClick={() => setIsFullscreen((value) => !value)}
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+            </Button>
           </DialogHeader>
 
           <Tabs defaultValue="actions" className="w-full flex flex-col flex-1 min-h-0 overflow-hidden">

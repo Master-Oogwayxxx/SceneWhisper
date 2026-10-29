@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
 from typing import Any
@@ -168,7 +169,25 @@ def _opened_content_ids() -> set[str]:
         db.close()
 
 
-def mark_work_opened(content_id: str) -> None:
+def _opened_sites_by_content_id() -> dict[str, list[str]]:
+    db = SessionLocal()
+    try:
+        rows = db.query(ActressWorkStateRecord).all()
+        result = {}
+        for row in rows:
+            try:
+                sites = json.loads(row.opened_sites or "[]")
+            except (TypeError, ValueError):
+                sites = []
+            result[str(row.content_id)] = [str(site) for site in sites if site]
+        return result
+    except SQLAlchemyError:
+        return {}
+    finally:
+        db.close()
+
+
+def mark_work_opened(content_id: str, site: str) -> None:
     """Persist that an actress work has been opened."""
     if not content_id:
         return
@@ -176,16 +195,19 @@ def mark_work_opened(content_id: str) -> None:
     try:
         row = db.query(ActressWorkStateRecord).filter(ActressWorkStateRecord.content_id == content_id).first()
         if row is None:
-            row = ActressWorkStateRecord(content_id=content_id, is_opened=True)
+            row = ActressWorkStateRecord(content_id=content_id, is_opened=True, opened_sites=json.dumps([site] if site else []))
             db.add(row)
         else:
             row.is_opened = True
+            sites = json.loads(row.opened_sites or "[]")
+            if site and site not in sites:
+                row.opened_sites = json.dumps([*sites, site])
         db.commit()
     finally:
         db.close()
 
 
-def mark_works_opened(content_ids: list[str]) -> int:
+def mark_works_opened(content_ids: list[str], sites: list[str]) -> int:
     """Persist that multiple actress works have been opened."""
     unique_content_ids = list(dict.fromkeys(content_id for content_id in content_ids if content_id))
     if not unique_content_ids:
@@ -198,9 +220,11 @@ def mark_works_opened(content_ids: list[str]) -> int:
         for content_id in unique_content_ids:
             row = existing_by_content_id.get(content_id)
             if row is None:
-                db.add(ActressWorkStateRecord(content_id=content_id, is_opened=True))
+                db.add(ActressWorkStateRecord(content_id=content_id, is_opened=True, opened_sites=json.dumps(sites)))
             else:
                 row.is_opened = True
+                current = json.loads(row.opened_sites or "[]")
+                row.opened_sites = json.dumps(list(dict.fromkeys([*current, *sites])))
         db.commit()
         return len(unique_content_ids)
     finally:
@@ -455,9 +479,11 @@ def get_actress(actress_id: int) -> dict[str, Any] | None:
             (actress_id, *extra_params),
         ).fetchall()
         opened_ids = _opened_content_ids()
+        opened_sites = _opened_sites_by_content_id()
         detail["recent_works"] = [
             row | {
                 "is_opened": row["content_id"] in opened_ids,
+                "opened_sites": opened_sites.get(row["content_id"], []),
             }
             for row in (_work_row_to_dict(work_row, has_jacket) for work_row in work_rows)
         ]
@@ -592,6 +618,7 @@ def list_actress_works(
             has_image, release_year, content_ids_include, content_ids_exclude,
         )
         opened_ids = _opened_content_ids()
+        opened_sites = _opened_sites_by_content_id()
 
         # Keep normalization/search semantics in one place while allowing SQLite
         # to deduplicate, count, and paginate before rows cross into Python.
@@ -655,7 +682,7 @@ def list_actress_works(
             conn.execute(f"{cte} SELECT COUNT(*) FROM filtered", params).fetchone()[0]
         )
         rows = [_work_row_to_dict(row, has_jacket) for row in work_rows]
-        return [row | {"is_opened": row["content_id"] in opened_ids} for row in rows], total
+        return [row | {"is_opened": row["content_id"] in opened_ids, "opened_sites": opened_sites.get(row["content_id"], [])} for row in rows], total
     finally:
         conn.close()
 

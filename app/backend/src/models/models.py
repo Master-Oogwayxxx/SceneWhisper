@@ -504,6 +504,7 @@ class ActressWork(BaseModel):
     resolution: Optional[str] = None
     local_file_state: Optional[str] = None
     is_opened: bool = False
+    opened_sites: list[str] = []
 
 
 class ActressDetail(ActressSummary):

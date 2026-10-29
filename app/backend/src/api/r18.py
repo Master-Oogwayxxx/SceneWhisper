@@ -113,10 +113,12 @@ class DownloadRequest(BaseModel):
 
 class WorkOpenedRequest(BaseModel):
     content_id: str
+    site: str
 
 
 class WorksOpenedRequest(BaseModel):
     content_ids: list[str]
+    sites: list[str] = []
 
 
 def _build_qbit_labels(
@@ -1021,7 +1023,7 @@ async def export_actress_magnets(actress_id: int):
 async def mark_actress_work_opened(body: WorkOpenedRequest):
     """Persist that an actress work card has been opened."""
     loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, lambda: r18_actress.mark_work_opened(body.content_id))
+    await loop.run_in_executor(None, lambda: r18_actress.mark_work_opened(body.content_id, body.site))
     return {"ok": True}
 
 
@@ -1029,7 +1031,7 @@ async def mark_actress_work_opened(body: WorkOpenedRequest):
 async def mark_actress_works_opened(body: WorksOpenedRequest):
     """Persist that multiple actress work cards have been opened."""
     loop = asyncio.get_running_loop()
-    updated = await loop.run_in_executor(None, lambda: r18_actress.mark_works_opened(body.content_ids))
+    updated = await loop.run_in_executor(None, lambda: r18_actress.mark_works_opened(body.content_ids, body.sites))
     return {"ok": True, "updated": updated}
 
 

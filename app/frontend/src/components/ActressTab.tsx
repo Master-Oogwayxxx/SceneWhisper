@@ -1192,7 +1192,7 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
                 </div>
               ) : (
                 <>
-                  <div className="border-b border-border px-2 py-2 sm:hidden">
+                  <div className="border-b border-border px-2 py-2">
                     <Button
                       type="button"
                       variant="ghost"
@@ -1359,7 +1359,7 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
           <div className="grid gap-3 pt-2 sm:grid-cols-2">
             <button
               type="button"
-              className="flex min-w-0 flex-col items-start gap-2 rounded-md border border-input bg-background px-4 py-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+              className="group flex min-w-0 flex-col items-start gap-2 rounded-md border border-input bg-background px-4 py-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
               disabled={importing}
               onClick={() => fileInputRef.current?.click()}
             >
@@ -1367,13 +1367,13 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
                 <Database className="h-4 w-4" />
                 Import local dump
               </span>
-              <span className="min-w-0 whitespace-normal break-words text-sm font-normal text-muted-foreground">
+              <span className="min-w-0 whitespace-normal break-words text-sm font-normal text-muted-foreground group-hover:text-accent-foreground">
                 Pick a `.sql.gz` dump file from disk and import it into SceneWhisper.
               </span>
             </button>
             <button
               type="button"
-              className="flex min-w-0 flex-col items-start gap-2 rounded-md border border-input bg-background px-4 py-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
+              className="group flex min-w-0 flex-col items-start gap-2 rounded-md border border-input bg-background px-4 py-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
               disabled={importing}
               onClick={() => void handleImportLatest()}
             >
@@ -1381,7 +1381,7 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
                 <Download className="h-4 w-4" />
                 Download latest dump
               </span>
-              <span className="min-w-0 whitespace-normal break-words text-sm font-normal text-muted-foreground">
+              <span className="min-w-0 whitespace-normal break-words text-sm font-normal text-muted-foreground group-hover:text-accent-foreground">
                 Fetch the current dump from `r18.dev` and start the import automatically.
               </span>
             </button>

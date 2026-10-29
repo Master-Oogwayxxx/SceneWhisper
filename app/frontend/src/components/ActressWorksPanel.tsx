@@ -25,7 +25,7 @@ import { useDownloads } from '@/hooks/useDownloads'
 import { r18Keys } from '@/hooks/useR18'
 import { useSettings } from '@/hooks/useSettings'
 import { ActressWorksFilterDialog } from './ActressWorksFilterDialog'
-import { ActressWorksFilterState, filterActressWorksByOpenedState, isActressWorksFilterActive } from '@/lib/actress-works-filters'
+import { ActressWorksFilterState, filterActressWorksByOpenedSite, filterActressWorksByOpenedState, isActressWorksFilterActive } from '@/lib/actress-works-filters'
 import { buildExternalVideoTargetUrl, isValidExternalVideoTarget } from '@/lib/external-video-targets'
 import { resolveSelectedWorkLinks } from '@/lib/selected-work-links'
 import { useQueryClient } from '@tanstack/react-query'
@@ -36,6 +36,7 @@ const EXPANDED_ACTIONS_MIN_WIDTH = 1920
 interface WorkLinkToOpen {
   contentId: string
   url: string
+  site: string
 }
 
 function WorkCardSkeleton({ showCover }: { showCover: boolean }) {
@@ -313,13 +314,14 @@ export function ActressWorksPanel({
   const queryClient = useQueryClient()
   const queueMap = new Map((queueItems ?? []).map((q) => [q.content_id, q]))
   const filteredWorks = useMemo(
-    () => filterActressWorksByOpenedState(works ?? [], worksFilter.opened),
-    [works, worksFilter.opened]
+    () => filterActressWorksByOpenedSite(filterActressWorksByOpenedState(works ?? [], worksFilter.opened), worksFilter.openedSite),
+    [works, worksFilter.opened, worksFilter.openedSite]
   )
   const externalVideoTargets = useMemo(
     () => settings.external_video_targets.filter(isValidExternalVideoTarget),
     [settings.external_video_targets]
   )
+  const openedSiteOptions = externalVideoTargets.map((target) => target.label)
   const selectedWorkLinks = resolveSelectedWorkLinks(selectedCodes, selectedWorks, filteredWorks)
   const [sortOpen, setSortOpen] = useState(false)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -376,12 +378,12 @@ export function ActressWorksPanel({
     return { openedCount: openedTabs.length, blockedCount }
   }
 
-  const persistOpenedStates = async (contentIds: string[]) => {
+  const persistOpenedStates = async (contentIds: string[], sites: string[]) => {
     const uniqueContentIds = Array.from(new Set(contentIds)).filter(Boolean)
     if (uniqueContentIds.length === 0) return
 
     try {
-      await r18Api.markActressWorksOpened(uniqueContentIds)
+      await r18Api.markActressWorksOpened(uniqueContentIds, Array.from(new Set(sites)).filter(Boolean))
       void queryClient.invalidateQueries({ queryKey: r18Keys.all() })
     } catch {
       toast.warning('Opened links, but failed to save opened state.')
@@ -407,7 +409,7 @@ export function ActressWorksPanel({
       openedLinks.push(link)
     }
 
-    void persistOpenedStates(openedLinks.map((link) => link.contentId))
+    void persistOpenedStates(openedLinks.map((link) => link.contentId), openedLinks.map((link) => link.site))
 
     if (openedLinks.length > 0) {
       toast.info(
@@ -424,6 +426,7 @@ export function ActressWorksPanel({
     const links = selectedWorkLinks.flatMap((work) =>
       selectedExternalTargets.map((target) => ({
         contentId: work.contentId,
+        site: target.label,
         url: buildExternalVideoTargetUrl(target, work.formattedId, actressName ?? ''),
       }))
     )
@@ -704,6 +707,7 @@ export function ActressWorksPanel({
               onDraftChange={onWorksFilterDraftChange}
               onApply={onWorksFilterApply}
               onReset={onWorksFilterReset}
+              openedSiteOptions={openedSiteOptions}
             />
             {!showExpandedActions && (
               <DropdownMenu open={mobileMoreOpen} onOpenChange={setMobileMoreOpen}>

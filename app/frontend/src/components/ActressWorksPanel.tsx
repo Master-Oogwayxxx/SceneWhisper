@@ -600,7 +600,7 @@ export function ActressWorksPanel({
                         }
                       }}
                       placeholder={resolvedActressName}
-                      className="h-8 min-w-0"
+                      className="h-7 w-36 min-w-0 max-w-full flex-none"
                       autoFocus
                     />
                     <Button type="button" size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={saveCustomActressName} aria-label="Save custom actress name">

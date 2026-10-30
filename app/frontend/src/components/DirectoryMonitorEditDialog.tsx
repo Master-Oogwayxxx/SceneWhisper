@@ -20,7 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DirectoryMonitor, TaskType } from '@/types/types';
-import { Subtitles, Scissors, ScanSearch, Edit3, Shuffle, RefreshCcw } from 'lucide-react';
+import { Subtitles, Scissors, ScanSearch, Edit3, Shuffle, RefreshCcw, X } from 'lucide-react';
 import { directoryApi } from '@/api/directories';
 import { utcTimeToLocal } from '@/lib/utils';
 
@@ -206,11 +206,25 @@ export function DirectoryMonitorEditDialog({
             <Label
                 key={option.value}
                 htmlFor={`edit-monitor-type-${option.value}`}
-                className={`flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-lg border p-2.5 text-sm transition-all ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${checked ? 'border-primary bg-primary/10' : disabled ? 'border-border' : 'border-border hover:border-primary/50'}`}
+                className={`relative flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-lg border p-2.5 text-sm transition-all ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'} ${checked ? 'border-primary bg-primary/10' : disabled ? 'border-border' : 'border-border hover:border-primary/50'}`}
             >
                 <Checkbox id={`edit-monitor-type-${option.value}`} checked={checked} disabled={disabled} onCheckedChange={() => toggleTaskType(option.value)} className="sr-only" />
                 {option.icon === 'split' ? <Scissors className="w-4 h-4" /> : option.icon === 'subtitle' ? <Subtitles className="w-4 h-4" /> : option.icon === 'remux' ? <Shuffle className="w-4 h-4" /> : option.icon === 'repair' ? <RefreshCcw className="w-4 h-4" /> : <ScanSearch className="w-4 h-4" />}
                 <span className="text-center">{option.label}</span>
+                {checked && (
+                    <button
+                        type="button"
+                        aria-label={`Remove ${option.label} task`}
+                        onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            toggleTaskType(option.value);
+                        }}
+                        className="absolute right-1.5 top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </button>
+                )}
             </Label>
         );
     };
@@ -276,12 +290,21 @@ export function DirectoryMonitorEditDialog({
                                     <div className="space-y-1.5">
                                         <Label className="text-sm font-medium">Split / Frame Pacing Resolution</Label>
                                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                            <Label className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all hover:border-primary/50">
+                                                <Checkbox
+                                                    checked={framePacingResolutions.length === 0}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) setFramePacingResolutions([]);
+                                                    }}
+                                                />
+                                                <span>All</span>
+                                            </Label>
                                             {MONITOR_RESOLUTION_OPTIONS.map((option) => (
                                                 <Label key={option.value} className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all hover:border-primary/50">
                                                     <Checkbox
                                                         checked={framePacingResolutions.includes(option.value)}
                                                         onCheckedChange={(checked) => setFramePacingResolutions((previous) => checked
-                                                            ? [...previous, option.value]
+                                                            ? [...previous.filter((value) => value !== option.value), option.value]
                                                             : previous.filter((value) => value !== option.value))}
                                                     />
                                                     <span>{option.label}</span>
@@ -367,12 +390,21 @@ export function DirectoryMonitorEditDialog({
                                     <div className="space-y-1.5">
                                         <Label className="text-sm font-medium">Split / Frame Pacing Resolution</Label>
                                         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                            <Label className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all hover:border-primary/50">
+                                                <Checkbox
+                                                    checked={framePacingResolutions.length === 0}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) setFramePacingResolutions([]);
+                                                    }}
+                                                />
+                                                <span>All</span>
+                                            </Label>
                                             {MONITOR_RESOLUTION_OPTIONS.map((option) => (
                                                 <Label key={option.value} className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all hover:border-primary/50">
                                                     <Checkbox
                                                         checked={framePacingResolutions.includes(option.value)}
                                                         onCheckedChange={(checked) => setFramePacingResolutions((previous) => checked
-                                                            ? [...previous, option.value]
+                                                            ? [...previous.filter((value) => value !== option.value), option.value]
                                                             : previous.filter((value) => value !== option.value))}
                                                     />
                                                     <span>{option.label}</span>

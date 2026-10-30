@@ -772,11 +772,14 @@ export const Dashboard = ({ tab, setTab, statsMinimized, highlightedTaskId, high
             open={isBulkEditOpen}
             selectedCount={selectedIds.size}
             onOpenChange={setIsBulkEditOpen}
-            onApply={async (patch) => {
+            onApply={async (patch, removeTaskType) => {
               const ids = Array.from(selectedIds);
               setBulkMonitorEditProgress({ open: true, total: ids.length, done: 0, failed: 0 });
-              await handleBulkUpdate(ids, patch, (done, total, failed) =>
-                setBulkMonitorEditProgress({ open: true, total, done, failed })
+              await handleBulkUpdate(
+                ids,
+                patch,
+                (done, total, failed) => setBulkMonitorEditProgress({ open: true, total, done, failed }),
+                removeTaskType,
               );
               clearSelection();
             }}

@@ -20,13 +20,13 @@ import {
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DirectoryMonitor, TaskType } from '@/types/types';
-import { Scissors, Subtitles, ScanSearch, Edit3, RefreshCcw, Layers } from 'lucide-react';
+import { Scissors, Subtitles, ScanSearch, Edit3, RefreshCcw, Layers, X } from 'lucide-react';
 
 interface MonitorBulkEditDialogProps {
     open: boolean;
     selectedCount: number;
     onOpenChange: (open: boolean) => void;
-    onApply: (patch: Partial<DirectoryMonitor>) => void;
+    onApply: (patch: Partial<DirectoryMonitor>, removeTaskType?: TaskType) => void;
 }
 
 const LANGUAGES = [
@@ -159,6 +159,7 @@ export function MonitorBulkEditDialog({
 }: MonitorBulkEditDialogProps) {
     const [applyActive, setApplyActive] = useState(false);
     const [applyTaskType, setApplyTaskType] = useState(false);
+    const [removeTaskType, setRemoveTaskType] = useState<MonitorTaskType | ''>('');
     const [applySplitScope, setApplySplitScope] = useState(false);
     const [applyFramePacingScope, setApplyFramePacingScope] = useState(false);
     const [applyResolution, setApplyResolution] = useState(false);
@@ -184,7 +185,7 @@ export function MonitorBulkEditDialog({
     const usesFramePacingRepair = taskTypes.some((type) => type === 'analyze_frame_pacing' || type === 'nvenc_frame_pacing');
     const usesResolutionFilter = usesDeleteVideoAfterCompletion || usesFramePacingRepair;
 
-    const canApply = (applyActive || applyTaskType || applySplitScope || applyFramePacingScope || applyResolution || applyNvencOverwriteOriginal || applySchedule || applyDeleteVideo || applyFillMissingSubtitles) && (!applyTaskType || taskTypes.length > 0);
+    const canApply = (applyActive || applyTaskType || removeTaskType || applySplitScope || applyFramePacingScope || applyResolution || applyNvencOverwriteOriginal || applySchedule || applyDeleteVideo || applyFillMissingSubtitles) && (!applyTaskType || taskTypes.length > 0);
 
     const handleApply = () => {
         const patch: Partial<DirectoryMonitor> = {};
@@ -211,7 +212,7 @@ export function MonitorBulkEditDialog({
         if (applyDeleteVideo) patch.deleteVideoAfterCompletion = usesDeleteVideoAfterCompletion ? deleteVideo : false;
         if (applyTaskType && !usesDeleteVideoAfterCompletion) patch.deleteVideoAfterCompletion = false;
         if (applyFillMissingSubtitles) patch.fillMissingSubtitles = fillMissingSubtitles;
-        onApply(patch);
+        onApply(patch, removeTaskType || undefined);
         onOpenChange(false);
     };
 
@@ -281,7 +282,7 @@ export function MonitorBulkEditDialog({
                     {/* Task Type */}
                     <div className="space-y-3 rounded-lg border border-border p-4">
                         <div className="flex items-center gap-2">
-                            <Checkbox id="apply-tasktype" checked={applyTaskType} onCheckedChange={(c) => setApplyTaskType(!!c)} />
+                            <Checkbox id="apply-tasktype" checked={applyTaskType} disabled={!!removeTaskType} onCheckedChange={(c) => setApplyTaskType(!!c)} />
                             <Label htmlFor="apply-tasktype" className="font-medium text-base cursor-pointer">Task Type</Label>
                         </div>
                         {applyTaskType && (
@@ -303,6 +304,23 @@ export function MonitorBulkEditDialog({
                                 </div>
                             </div>
                         )}
+                        <div className="space-y-2 border-t border-border pt-3">
+                            <div className="flex items-center gap-2">
+                                <X className="h-4 w-4 text-destructive" />
+                                <Label className="font-medium text-base">Remove a task type</Label>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Remove this task from every selected directory monitor while preserving its other tasks.</p>
+                            <Select value={removeTaskType} onValueChange={(value) => { setRemoveTaskType(value as MonitorTaskType); setApplyTaskType(false); }}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a task to remove" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {BULK_TASK_TYPES.map((type) => (
+                                        <SelectItem key={type} value={type}>{getTaskTypeLabel(type)}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     {/* Task-specific options */}

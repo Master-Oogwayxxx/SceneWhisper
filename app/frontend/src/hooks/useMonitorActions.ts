@@ -162,9 +162,24 @@ export const useMonitorActions = (
     }
   }
 
-  const handleBulkUpdate = async (ids: string[], patch: Partial<DirectoryMonitor>, onProgress?: (done: number, total: number, failed: number) => void) => {
+  const handleBulkUpdate = async (ids: string[], patch: Partial<DirectoryMonitor>, onProgress?: (done: number, total: number, failed: number) => void, removeTaskType?: DirectoryMonitor['taskType']) => {
     const originals = monitors.filter((m) => ids.includes(m.id))
-    const updated = originals.map((m) => ({ ...m, ...patch }))
+    const updated = originals.map((m) => {
+      const taskTypes = m.taskTypes?.length ? m.taskTypes : [m.taskType]
+      const nextTaskTypes = removeTaskType
+        ? taskTypes.filter((type) => type !== removeTaskType)
+        : taskTypes
+      return {
+        ...m,
+        ...patch,
+        ...(removeTaskType
+          ? {
+              taskTypes: nextTaskTypes,
+              taskType: nextTaskTypes[0] ?? m.taskType,
+            }
+          : {}),
+      }
+    })
     setMonitors((prev) =>
       prev.map((m) => {
         const u = updated.find((u) => u.id === m.id)

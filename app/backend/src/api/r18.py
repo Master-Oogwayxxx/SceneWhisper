@@ -38,7 +38,10 @@ from ..schemas.db_helper import db_session
 from ..schemas.actress_work_file_state import ActressWorkFileStateRecord
 from ..schemas.download_queue import DownloadQueueRecord
 from ..schemas.file import FileRecord
-from ..schemas.r18_db import ensure_r18_indexes, get_import_status, r18_db_ready, read_metadata, save_uploaded_gz, schedule_import_from_url, schedule_import_r18_sql_gz
+from ..schemas.r18_db import R18_DB_PATH, ensure_r18_indexes, get_import_status, r18_db_ready, read_metadata, save_uploaded_gz, schedule_import_from_url, schedule_import_r18_sql_gz
+from ..schemas.metadata_provider import active_provider, refresh_metadata_database
+from ..schemas.db_helper import DB_PATH
+from ..schemas.metadata_provider import active_provider, refresh_metadata_database
 from ..utils.qbit import delete_torrent as _delete_torrent
 from ..utils.qbit import find_torrent_hash_by_name as _find_torrent_hash
 from ..utils.qbit import send_to_qbit as _send_to_qbit
@@ -1116,6 +1119,21 @@ async def import_from_url(body: ImportFromUrlBody | None = None):
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         logging.exception("R18 import-from-url failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/metadata/refresh")
+async def refresh_metadata():
+    """Refresh the selected non-R18 metadata provider from its upstream JSON index."""
+    provider, db_path = active_provider(DB_PATH, R18_DB_PATH)
+    if provider != "japanese_adult_video_metadata":
+        raise HTTPException(status_code=409, detail="Select Japanese Adult Video Metadata before refreshing it.")
+    loop = asyncio.get_running_loop()
+    try:
+        await loop.run_in_executor(None, lambda: refresh_metadata_database(db_path))
+        return {"status": "completed", "provider": provider}
+    except Exception as exc:
+        logging.exception("Alternative metadata refresh failed")
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:
         logging.exception("R18 import-from-url failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc

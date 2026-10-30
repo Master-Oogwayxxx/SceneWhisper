@@ -19,6 +19,8 @@ from ..models.notification import NotificationType
 from ..notification_service import emit_notification_sync
 from .r18_schema import ACTRESS_TABLE
 from .r18_pg_dump_importer import import_pg_dump_sql_gz
+from .metadata_provider import active_provider, ensure_metadata_database
+from .db_helper import DB_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +95,10 @@ def get_r18_connection() -> sqlite3.Connection:
     Raises:
         sqlite3.Error: If the database file is missing or unreadable.
     """
-    conn = sqlite3.connect(R18_DB_PATH, check_same_thread=False)
+    provider, db_path = active_provider(DB_PATH, R18_DB_PATH)
+    if provider == "japanese_adult_video_metadata":
+        ensure_metadata_database(db_path)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -314,7 +319,14 @@ def ensure_r18_indexes() -> None:
 
 def r18_db_ready() -> bool:
     """Return True when the R18 database exists and has actress data."""
-    if not R18_DB_PATH.exists():
+    _, db_path = active_provider(DB_PATH, R18_DB_PATH)
+    if db_path.name == "japanese-adult-video-metadata.db":
+        try:
+            ensure_metadata_database(db_path)
+        except Exception as exc:
+            logger.warning("Alternative metadata provider unavailable: %s", exc)
+            return False
+    if not db_path.exists():
         return False
     try:
         conn = get_r18_connection()

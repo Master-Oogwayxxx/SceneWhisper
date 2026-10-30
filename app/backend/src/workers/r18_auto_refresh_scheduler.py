@@ -8,7 +8,9 @@ from datetime import datetime, timezone
 
 from ..api.r18 import LATEST_DUMP_URL
 from ..crud.setting import get_settings, patch_settings
-from ..schemas.r18_db import schedule_import_from_url
+from ..schemas.r18_db import R18_DB_PATH, schedule_import_from_url
+from ..schemas.db_helper import DB_PATH
+from ..schemas.metadata_provider import active_provider, refresh_metadata_database
 from ..utils import calculate_next_run, utc_isoformat
 
 _POLL_INTERVAL = 60
@@ -53,7 +55,11 @@ async def run_due_r18_auto_refresh() -> bool:
 
         next_run = utc_isoformat(calculate_next_run(schedule_payload))
         try:
-            schedule_import_from_url(LATEST_DUMP_URL)
+            provider, metadata_path = active_provider(DB_PATH, R18_DB_PATH)
+            if provider == "japanese_adult_video_metadata":
+                refresh_metadata_database(metadata_path)
+            else:
+                schedule_import_from_url(LATEST_DUMP_URL)
         except Exception as exc:
             patch_settings(
                 {

@@ -27,6 +27,10 @@ function parseActressDownloadMonitor(data: ActressDownloadMonitor): ActressDownl
 }
 
 export const r18Api = {
+  async refreshMetadata(): Promise<void> {
+    const res = await fetch(`${API_BASE}/r18/metadata/refresh`, { method: 'POST' })
+    if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Failed to refresh metadata')
+  },
   async getStatus(): Promise<R18Status> {
     const res = await fetch(`${API_BASE}/r18/status`)
     if (!res.ok) throw new Error('Failed to fetch R18 status')

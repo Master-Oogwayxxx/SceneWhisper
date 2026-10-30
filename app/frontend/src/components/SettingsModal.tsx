@@ -1340,6 +1340,15 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         onCheckedChange={(v) => patchSettings({ show_actress_work_titles: v })}
                       />
                     </SettingRow>
+                    <SettingRow label="Actress metadata source" description="Choose which indexed metadata database powers the Actresses tab. Changing this may require reloading the tab.">
+                      <Select value={settings.metadata_provider} onValueChange={(value) => { patchSettings({ metadata_provider: value as 'r18' | 'japanese_adult_video_metadata' }); void queryClient.invalidateQueries({ queryKey: ['r18'] }) }}>
+                        <SelectTrigger className="w-full sm:w-[260px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="r18">R18.dev</SelectItem>
+                          <SelectItem value="japanese_adult_video_metadata">Japanese Adult Video Metadata</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </SettingRow>
                     <div className="flex flex-col gap-2.5 py-2.5 sm:gap-3 sm:py-3">
                       <div>
                         <Label className="text-xs font-medium sm:text-sm">External video code links</Label>

@@ -875,11 +875,21 @@ def _drop_ffmpeg_split_settings_columns() -> None:
         db.close()
 
 
+def _ensure_metadata_provider_column() -> None:
+    """Add the selectable actress metadata provider to legacy databases."""
+    with engine.connect() as conn:
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(settings)"))}
+        if "metadata_provider" not in columns:
+            conn.execute(text("ALTER TABLE settings ADD COLUMN metadata_provider TEXT NOT NULL DEFAULT 'r18'"))
+            conn.commit()
+
+
 def init_db():
     """Initialize database tables"""
     from ..log_handler import mark_db_ready
 
     Base.metadata.create_all(bind=engine)
+    _ensure_metadata_provider_column()
     _ensure_ignore_patterns_column()
     _ensure_merge_input_paths_column()
     _ensure_selected_scan_directories_column()

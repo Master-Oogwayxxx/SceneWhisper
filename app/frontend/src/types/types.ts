@@ -525,6 +525,7 @@ export interface AppSettings {
   r18_auto_refresh_last_run: string | null
   r18_auto_refresh_next_run: string | null
   r18_auto_refresh_last_error: string | null
+  metadata_provider: 'r18' | 'japanese_adult_video_metadata'
 }
 
 export interface ExternalVideoTarget {

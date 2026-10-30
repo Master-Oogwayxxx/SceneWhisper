@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarClock, ChevronLeft, ChevronRight, Database, Download, ListOrdered, Loader2, Search, Star, User } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { CalendarClock, ChevronLeft, ChevronRight, Database, Download, ListOrdered, Loader2, RotateCcw, Search, Star, User } from 'lucide-react'
 import { toast } from 'sonner'
 import { ActressDetail, ActressDownloadMonitor, ActressSummary, ActressWork, DownloadQueueItem, R18Status } from '@/types/types'
 import {
@@ -162,7 +163,7 @@ export function R18AutoRefreshSection({ settings, onPatch }: R18AutoRefreshSecti
         <div className="space-y-1">
           <p className="font-medium">Weekly auto-refresh</p>
           <p className="text-sm text-muted-foreground">
-            Automatically download and import the latest `r18.dev` dump every week.
+            Automatically refresh the selected actress metadata provider every week.
           </p>
         </div>
         <Switch
@@ -392,6 +393,7 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
   const [worksFilter, setWorksFilter] = useState<ActressWorksFilterState>(EMPTY_ACTRESS_WORKS_FILTER_STATE)
   const [worksFilterDraft, setWorksFilterDraft] = useState<ActressWorksFilterState>(EMPTY_ACTRESS_WORKS_FILTER_STATE)
   const [importing, setImporting] = useState(false)
+  const [refreshingMetadata, setRefreshingMetadata] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [selectedWorks, setSelectedWorks] = useState<ActressWork[]>([])
@@ -432,6 +434,7 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
   } = useR18ActressWorks(selectedId, worksPage, worksPageSize, dbLoaded, worksSortBy, worksSortDir, worksSearch, worksFilter)
   const { importFile, importLatest } = useR18ImportMutations()
   const { settings, patchSettings } = useSettings()
+  const queryClient = useQueryClient()
   const showCovers = settings.show_actress_work_covers
   const showTitles = settings.show_actress_work_titles ?? true
   const { items: queueItems, pendingCount, clearDone, clearFailed, refresh: refreshQueue } = useQueue()
@@ -876,6 +879,19 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
     }
   }
 
+  const handleRefreshMetadata = async () => {
+    setRefreshingMetadata(true)
+    try {
+      await r18Api.refreshMetadata()
+      await queryClient.invalidateQueries({ queryKey: ['r18'] })
+      toast.success('Metadata refreshed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Metadata refresh failed')
+    } finally {
+      setRefreshingMetadata(false)
+    }
+  }
+
   const totalPages = favoritesOnly ? 0 : (searchResults ? Math.ceil(searchResults.total / PAGE_SIZE) : 0)
   const worksTotalPages = worksResults ? Math.ceil(worksResults.total / worksPageSize) : 0
   const showEmpty = status && !status.loaded && !status.import_in_progress && !importing
@@ -904,6 +920,27 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
         </form>
 
         <div className="flex items-center gap-2 px-1 sm:px-0">
+          <Select
+            value={settings.metadata_provider}
+            onValueChange={(value) => {
+              patchSettings({ metadata_provider: value as 'r18' | 'japanese_adult_video_metadata' })
+              void queryClient.invalidateQueries({ queryKey: ['r18'] })
+            }}
+          >
+            <SelectTrigger className="h-8 w-[150px] text-xs sm:w-[210px] sm:text-sm" aria-label="Actress metadata source">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="r18">R18.dev</SelectItem>
+              <SelectItem value="japanese_adult_video_metadata">Japanese Adult Video Metadata</SelectItem>
+            </SelectContent>
+          </Select>
+          {settings.metadata_provider === 'japanese_adult_video_metadata' && (
+            <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => void handleRefreshMetadata()} disabled={refreshingMetadata}>
+              <RotateCcw className={cn('h-3.5 w-3.5', refreshingMetadata && 'animate-spin')} />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          )}
           {status?.loaded && (
             <Badge variant="secondary" className="h-8 gap-1 shrink-0">
               <User className="h-3 w-3" />
@@ -1386,12 +1423,14 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Load r18.dev dump</DialogTitle>
+            <DialogTitle>{settings.metadata_provider === 'r18' ? 'Load r18.dev dump' : 'Refresh actress metadata'}</DialogTitle>
             <DialogDescription>
-              Choose whether to import a local dump file or download the latest dump from r18.dev.
+              {settings.metadata_provider === 'r18'
+                ? 'Choose whether to import a local dump file or download the latest dump from r18.dev.'
+                : 'Refresh the latest metadata from the selected upstream JSON index.'}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 pt-2 sm:grid-cols-2">
+          {settings.metadata_provider === 'r18' ? <div className="grid gap-3 pt-2 sm:grid-cols-2">
             <button
               type="button"
               className="group flex min-w-0 flex-col items-start gap-2 rounded-md border border-input bg-background px-4 py-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
@@ -1420,7 +1459,9 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
                 Fetch the current dump from `r18.dev` and start the import automatically.
               </span>
             </button>
-          </div>
+          </div> : <div className="pt-2"><Button type="button" className="w-full" onClick={() => void handleRefreshMetadata()} disabled={refreshingMetadata}>
+            <RotateCcw className={cn('mr-2 h-4 w-4', refreshingMetadata && 'animate-spin')} /> Refresh now
+          </Button></div>}
           <R18AutoRefreshSection
             settings={settings}
             onPatch={(updates) => patchSettings(updates)}

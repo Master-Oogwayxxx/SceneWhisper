@@ -111,6 +111,7 @@ const DEFAULTS: AppSettings = {
   r18_auto_refresh_last_run: null,
   r18_auto_refresh_next_run: null,
   r18_auto_refresh_last_error: null,
+  metadata_provider: 'r18',
 }
 
 export function useSettings() {

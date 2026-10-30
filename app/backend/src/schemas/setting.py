@@ -94,6 +94,7 @@ class SettingRecord(Base):
     r18_auto_refresh_last_run = Column(String, nullable=True)
     r18_auto_refresh_next_run = Column(String, nullable=True)
     r18_auto_refresh_last_error = Column(Text, nullable=True)
+    metadata_provider = Column(String, nullable=False, default="r18")
 
     # qBittorrent
     qbittorrent_url = Column(String, nullable=False, default="")

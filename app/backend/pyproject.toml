@@ -16,7 +16,6 @@ dependencies = [
     "python-dotenv",
     "av",
     "deep-translator>=1.11.4",
-    "argostranslate>=1.9.6",
     "tzdata",
 ]
 [tool.ruff.lint]

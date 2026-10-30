@@ -150,7 +150,6 @@ class BulkRenameOptions(BaseModel):
     replace_text: str = ""
     remove_first_n: int = 0
     remove_last_n: int = 0
-    translate_to_english: bool = False
     case_conversion: Literal["none", "capitalize", "lower"] = "none"
     hide_split_videos: bool = False
 
@@ -167,18 +166,6 @@ class BulkRenameUndoItem(BaseModel):
 
 class BulkRenameUndoRequest(BaseModel):
     items: list[BulkRenameUndoItem]
-
-
-def _translate_japanese_to_english(value: str) -> str:
-    try:
-        from argostranslate import translate
-
-        translation = translate.get_translation_from_codes("ja", "en")
-    except Exception as exc:
-        raise RuntimeError("Japanese-to-English translation is unavailable") from exc
-    if translation is None:
-        raise RuntimeError("Japanese-to-English translation model is not installed")
-    return translation.translate(value)
 
 
 def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
@@ -202,8 +189,6 @@ def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:
             stem,
             flags=re.IGNORECASE,
         )
-    if options.translate_to_english and stem:
-        stem = _translate_japanese_to_english(stem)
     code_match = re.search(r"\b([A-Za-z]{2,8})[-_ ]?(\d{2,5})\b", stem, re.IGNORECASE)
     code = f"{code_match.group(1).upper()}-{code_match.group(2)}" if code_match else ""
     suffix_match = re.search(r"(?:^|[-_ ])(RM|SUB|UC)\b", stem, re.IGNORECASE)

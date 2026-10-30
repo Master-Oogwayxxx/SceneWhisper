@@ -52,7 +52,6 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     replace_text: '',
     remove_first_n: 0,
     remove_last_n: 0,
-    translate_to_english: false,
     case_conversion: 'none',
     hide_split_videos: true,
   })
@@ -95,8 +94,6 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
   const updateOption = (key: keyof BulkRenameOptions, value: boolean) => setOptions((current) => ({
     ...current,
     [key]: value,
-    // Code-only extraction would discard the translated title from the preview.
-    ...(key === 'translate_to_english' && value ? { extract_video_code: false } : {}),
   }))
   const toggleDirectory = (id: string) => {
     setAllDirectories(false)
@@ -233,7 +230,6 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
     replace_text: '',
     remove_first_n: 0,
     remove_last_n: 0,
-    translate_to_english: false,
     case_conversion: 'none',
     hide_split_videos: true,
   })
@@ -290,10 +286,6 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
               <input type='number' min='0' value={options.remove_last_n} onChange={(event) => setOptions((current) => ({ ...current, remove_last_n: Math.max(0, Number(event.target.value) || 0) }))} className='w-full rounded border border-input bg-background px-2 py-1.5' />
             </label>
             <div className='border-t-2 border-border' />
-            <label className='flex items-center gap-2 text-sm'>
-              <input type='checkbox' checked={options.translate_to_english} onChange={(event) => updateOption('translate_to_english', event.target.checked)} />
-              Translate Japanese to English
-            </label>
             <label className='text-sm'>
               <span className='mb-1 block font-medium'>Filename case</span>
               <select value={options.case_conversion} onChange={(event) => setOptions((current) => ({ ...current, case_conversion: event.target.value as BulkRenameOptions['case_conversion'] }))} className='w-full rounded border border-input bg-background px-2 py-1.5'>
@@ -370,12 +362,6 @@ export function BulkFileRenameTool({ onBack }: { onBack: () => void }) {
                       onChange={(event) => {
                         const shiftKey = event.nativeEvent instanceof MouseEvent && event.nativeEvent.shiftKey
                         selectFile(item.fileId, shiftKey)
-                        if (options.translate_to_english) {
-                          const nextSelection = event.target.checked
-                            ? Array.from(new Set([...selectedFileIds, item.fileId]))
-                            : selectedFileIds.filter((id) => id !== item.fileId)
-                          void preview(undefined, nextSelection)
-                        }
                         if (!event.target.checked) {
                           setItems((current) => current.map((currentItem) => currentItem.fileId === item.fileId ? { ...currentItem, newName: currentItem.originalName } : currentItem))
                         }

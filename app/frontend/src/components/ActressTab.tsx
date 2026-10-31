@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Database, Download, ListOrdered, Loader2, Search, Star, User } from 'lucide-react'
+import { CalendarClock, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Database, Download, ListOrdered, Loader2, Search, Star, User, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { ActressDetail, ActressDownloadMonitor, ActressSummary, ActressWork, DownloadQueueItem, MetadataScraperConfig, R18Status } from '@/types/types'
 import {
@@ -15,7 +15,6 @@ import { useQueue } from '@/hooks/useQueue'
 import { r18Api } from '@/api/r18'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
-import { Badge } from './ui/badge'
 import { Skeleton } from './ui/skeleton'
 import { Progress } from './ui/progress'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
@@ -32,6 +31,7 @@ import { useDownloads } from '@/hooks/useDownloads'
 import { formatActressName, useActressCustomNames } from '@/hooks/useActressCustomNames'
 import { EMPTY_METADATA_SCRAPER_CONFIG, MetadataScraperProgress, runMetadataScraper } from '@/lib/metadata-scraper'
 import { MetadataScraperDialog } from './MetadataScraperDialog'
+import { fileApi } from '@/api/files'
 
 const PAGE_SIZE = 50
 import { API_BASE } from '@/api/client'
@@ -176,10 +176,10 @@ export function R18AutoRefreshSection({ settings, onPatch }: R18AutoRefreshSecti
             onPatch(
               checked
                 ? {
-                    r18_auto_refresh_enabled: true,
-                    r18_auto_refresh_time: localTimeToUtc(time),
-                    r18_auto_refresh_day_of_week: dayOfWeek,
-                  }
+                  r18_auto_refresh_enabled: true,
+                  r18_auto_refresh_time: localTimeToUtc(time),
+                  r18_auto_refresh_day_of_week: dayOfWeek,
+                }
                 : { r18_auto_refresh_enabled: false },
             )
           }}
@@ -370,6 +370,7 @@ export const ActressTab = () => {
     const parsedId = Number(queryId)
     return Number.isInteger(parsedId) ? parsedId : null
   })
+  const [actressListOpen, setActressListOpen] = useState(false)
   const [worksPage, setWorksPage] = useState(() => {
     const value = Number(new URLSearchParams(window.location.search).get('worksPage'))
     return Number.isInteger(value) && value >= 1 ? value - 1 : 0
@@ -399,6 +400,7 @@ export const ActressTab = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [selectedWorks, setSelectedWorks] = useState<ActressWork[]>([])
+  const [deletingSelected, setDeletingSelected] = useState(false)
   const [queueAllLoading, setQueueAllLoading] = useState(false)
   const [queueAllDialogOpen, setQueueAllDialogOpen] = useState(false)
   const [queueAllSavePath, setQueueAllSavePath] = useState('')
@@ -601,6 +603,30 @@ export const ActressTab = () => {
     selectionAnchorRef.current = null
   }, [])
 
+  const handleDeleteSelected = useCallback(async () => {
+    if (!selectedWorks.length || !window.confirm(`Delete ${selectedWorks.length} selected video${selectedWorks.length === 1 ? '' : 's'} from disk and database?`)) return
+    setDeletingSelected(true)
+    try {
+      let deleted = 0
+      for (const work of selectedWorks) {
+        const code = work.video_code ?? work.dvd_id ?? work.content_id
+        const result = await fileApi.getFiles({ page: 1, limit: 50, search: code, sortBy: 'name', sortDir: 'asc' })
+        const matches = result.files.filter((file) => file.file_type === 'video' && file.name.toLowerCase().includes(code.toLowerCase()))
+        for (const file of matches) {
+          await fileApi.deleteFile(file.id)
+          deleted += 1
+        }
+      }
+      clearSelectedWorks()
+      await queryClient.invalidateQueries({ queryKey: ['r18'] })
+      toast.success(deleted ? `Deleted ${deleted} video${deleted === 1 ? '' : 's'}` : 'No local videos found for the selected works')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete selected videos')
+    } finally {
+      setDeletingSelected(false)
+    }
+  }, [clearSelectedWorks, queryClient, selectedWorks])
+
   const handleWorksPageChange = useCallback((page: number) => {
     clearSelectedWorks()
     setWorksPage(page)
@@ -665,18 +691,18 @@ export const ActressTab = () => {
             dayOfWeek: patch.dayOfWeek,
           },
           isActive: patch.isActive,
-            criteria: {
-              search: worksSearch,
-              sortBy: worksSortBy,
-              sortDir: worksSortDir,
-              fileExists: worksFilter.fileExists,
-              localFileState: worksFilter.localFileStatus,
-              uncensored: worksFilter.uncensored,
-              censored: worksFilter.censored,
-              subtitled: worksFilter.subtitled,
-              resolution: worksFilter.resolution,
-              releaseYear: worksFilter.releaseYear,
-            },
+          criteria: {
+            search: worksSearch,
+            sortBy: worksSortBy,
+            sortDir: worksSortDir,
+            fileExists: worksFilter.fileExists,
+            localFileState: worksFilter.localFileStatus,
+            uncensored: worksFilter.uncensored,
+            censored: worksFilter.censored,
+            subtitled: worksFilter.subtitled,
+            resolution: worksFilter.resolution,
+            releaseYear: worksFilter.releaseYear,
+          },
           maxItemsPerRun: patch.maxItemsPerRun,
           savePath: patch.savePath,
           lastRun: null,
@@ -1055,7 +1081,7 @@ export const ActressTab = () => {
             onClick={() => setImportDialogOpen(true)}
           >
             {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Load r18.dev Dump
+            r18.dev
           </Button>
           <Button
             type="button"
@@ -1116,13 +1142,55 @@ export const ActressTab = () => {
 
       {status?.loaded && (
         <div className="flex-1 flex min-h-0 sm:gap-4">
-          {!searchResultsHidden && (
+          {selectedId !== null && actressListOpen && <div className="fixed inset-0 z-30 bg-black/50 xl:hidden" onClick={() => setActressListOpen(false)} aria-hidden="true" />}
+          {(!searchResultsHidden || selectedId === null || actressListOpen) && (
             <div
               className={cn(
                 'flex flex-col min-w-0 border border-border rounded-lg overflow-hidden shrink-0 transition-[width]',
-                selectedId === null ? 'flex-1' : 'hidden sm:flex sm:w-[min(100%,280px)]'
+                selectedId === null
+                  ? 'flex-1'
+                  : actressListOpen
+                    ? 'fixed left-1/2 top-1/2 z-40 flex max-h-[72vh] w-[min(calc(100%-1rem),420px)] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-background shadow-xl xl:static xl:z-auto xl:max-h-none xl:w-[min(100%,280px)] xl:translate-x-0 xl:translate-y-0 xl:rounded-lg xl:shadow-none'
+                    : 'hidden xl:flex xl:w-[min(100%,280px)]'
               )}
             >
+              {selectedId !== null && actressListOpen && (
+                <div className="flex shrink-0 flex-col gap-2 border-b border-border p-2 xl:hidden">
+                  <div className="flex items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 shrink-0 gap-1 px-2"
+                      onClick={() => { setSelectedId(null); setActressListOpen(false) }}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      List
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setActressListOpen(false)} aria-label="Close actress list">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <form
+                    className="relative w-full"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      if (debounceRef.current) clearTimeout(debounceRef.current)
+                      setSearchQuery(searchDraft)
+                      setPage(0)
+                    }}
+                  >
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      className="h-9 pl-8"
+                      placeholder="Search actresses..."
+                      value={searchDraft}
+                      onChange={(event) => handleSearchChange(event.target.value)}
+                      aria-label="Search actresses"
+                    />
+                  </form>
+                </div>
+              )}
               <div className={cn('flex-1 overflow-y-auto scrollbar', selectedId === null && 'p-2 sm:p-4')}>
                 {isActressListLoading ? (
                   selectedId === null ? (
@@ -1142,11 +1210,12 @@ export const ActressTab = () => {
                       {visibleActresses.map((actress) => (
                         <div
                           key={actress.id}
-                          onClick={() => setSelectedId(actress.id)}
+                          onClick={() => { setSelectedId(actress.id); setActressListOpen(false) }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
                               e.preventDefault()
                               setSelectedId(actress.id)
+                              setActressListOpen(false)
                             }
                           }}
                           role="button"
@@ -1190,11 +1259,12 @@ export const ActressTab = () => {
                     visibleActresses.map((actress) => (
                       <div
                         key={actress.id}
-                        onClick={() => setSelectedId(actress.id)}
+                        onClick={() => { setSelectedId(actress.id); setActressListOpen(false) }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault()
                             setSelectedId(actress.id)
+                            setActressListOpen(false)
                           }
                         }}
                         role="button"
@@ -1262,44 +1332,44 @@ export const ActressTab = () => {
                         </Button>
                       </div>
                     ) : (
-                    <div className="scrollbar flex items-center justify-center gap-1 overflow-x-auto">
-                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === 1} onClick={() => setPage(0)} aria-label="First page">
-                      <ChevronFirst aria-hidden="true" />
-                    </Button>
-                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === 1} onClick={() => setPage((p) => Math.max(0, p - 1))} aria-label="Previous page">
-                      <ChevronLeft aria-hidden="true" />
-                    </Button>
-                    {startPage > 1 && (
-                      <>
-                        <Button type="button" variant="outline" size="sm" className="h-8 min-w-8 px-2" onClick={() => setPage(0)}>1</Button>
-                        {startPage > 2 && <span className="px-1 text-xs">...</span>}
-                      </>
-                    )}
-                    {pageNumbers.map((pageNumber) => (
-                      <Button
-                        key={pageNumber}
-                        type="button"
-                        variant={currentPage === pageNumber ? 'default' : 'outline'}
-                        size="sm"
-                        className="h-8 min-w-8 px-2"
-                        onClick={() => setPage(pageNumber - 1)}
-                      >
-                        {pageNumber}
-                      </Button>
-                    ))}
-                    {endPage < totalPages && (
-                      <>
-                        {endPage < totalPages - 1 && <span className="px-1 text-xs">...</span>}
-                        <Button type="button" variant="outline" size="sm" className="h-8 min-w-8 px-2" onClick={() => setPage(totalPages - 1)}>{totalPages}</Button>
-                      </>
-                    )}
-                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === totalPages} onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} aria-label="Next page">
-                      <ChevronRight aria-hidden="true" />
-                    </Button>
-                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === totalPages} onClick={() => setPage(totalPages - 1)} aria-label="Last page">
-                      <ChevronLast aria-hidden="true" />
-                    </Button>
-                    </div>
+                      <div className="scrollbar flex items-center justify-center gap-1 overflow-x-auto">
+                        <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === 1} onClick={() => setPage(0)} aria-label="First page">
+                          <ChevronFirst aria-hidden="true" />
+                        </Button>
+                        <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === 1} onClick={() => setPage((p) => Math.max(0, p - 1))} aria-label="Previous page">
+                          <ChevronLeft aria-hidden="true" />
+                        </Button>
+                        {startPage > 1 && (
+                          <>
+                            <Button type="button" variant="outline" size="sm" className="h-8 min-w-8 px-2" onClick={() => setPage(0)}>1</Button>
+                            {startPage > 2 && <span className="px-1 text-xs">...</span>}
+                          </>
+                        )}
+                        {pageNumbers.map((pageNumber) => (
+                          <Button
+                            key={pageNumber}
+                            type="button"
+                            variant={currentPage === pageNumber ? 'default' : 'outline'}
+                            size="sm"
+                            className="h-8 min-w-8 px-2"
+                            onClick={() => setPage(pageNumber - 1)}
+                          >
+                            {pageNumber}
+                          </Button>
+                        ))}
+                        {endPage < totalPages && (
+                          <>
+                            {endPage < totalPages - 1 && <span className="px-1 text-xs">...</span>}
+                            <Button type="button" variant="outline" size="sm" className="h-8 min-w-8 px-2" onClick={() => setPage(totalPages - 1)}>{totalPages}</Button>
+                          </>
+                        )}
+                        <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === totalPages} onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} aria-label="Next page">
+                          <ChevronRight aria-hidden="true" />
+                        </Button>
+                        <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === totalPages} onClick={() => setPage(totalPages - 1)} aria-label="Last page">
+                          <ChevronLast aria-hidden="true" />
+                        </Button>
+                      </div>
                     )}
                     <span className={cn('pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 whitespace-nowrap text-xs text-muted-foreground', selectedId === null && 'sm:inline')}>
                       {(favoritesOnly ? favoriteActresses.length : searchResults?.total ?? 0).toLocaleString()} actresses
@@ -1311,7 +1381,7 @@ export const ActressTab = () => {
           )}
 
           <div className={cn('relative min-w-0', selectedId === null ? 'hidden w-0 flex-none overflow-hidden sm:block' : 'flex-1', searchResultsHidden && 'sm:pl-4')}>
-            <div className={cn('absolute top-1/2 z-20 hidden -translate-x-1/2 -translate-y-1/2 sm:block', searchResultsHidden ? 'left-4' : 'left-0')}>
+            <div className={cn('absolute top-1/2 z-20 hidden -translate-x-1/2 -translate-y-1/2 xl:block', searchResultsHidden ? 'left-4' : 'left-0')}>
               <Button
                 type="button"
                 variant="outline"
@@ -1336,10 +1406,13 @@ export const ActressTab = () => {
                       variant="ghost"
                       size="sm"
                       className="h-8 gap-1.5 px-2"
-                      onClick={() => setSelectedId(null)}
+                      onClick={() => {
+                        if (window.matchMedia('(max-width: 1279px)').matches) setActressListOpen(true)
+                        else setSelectedId(null)
+                      }}
                     >
                       <ChevronLeft className="h-4 w-4" />
-                      Actresses
+                      Browse Actresses
                     </Button>
                   </div>
                   <ActressWorksPanel
@@ -1392,6 +1465,8 @@ export const ActressTab = () => {
                     onQueueAll={handleOpenQueueAll}
                     queueAllLoading={queueAllLoading}
                     onCancelDownload={(contentId) => void handleCancelDownload(contentId)}
+                    onDeleteSelected={() => void handleDeleteSelected()}
+                    deletingSelected={deletingSelected}
                     onScheduleActress={openCreateSchedule}
                     onAddScraper={openMetadataScraperConfig}
                     actressName={detail ? formatActressName(detail, actressCustomNames) : undefined}

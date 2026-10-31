@@ -29,6 +29,7 @@ const RESOLUTION_OPTIONS: { value: ActressWorkResolutionFilter; label: string }[
 ]
 
 interface Props {
+  className?: string
   isFilterActive: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -77,6 +78,7 @@ function TriStateControl({
 }
 
 export function ActressWorksFilterDialog({
+  className,
   isFilterActive,
   open,
   onOpenChange,
@@ -92,7 +94,7 @@ export function ActressWorksFilterDialog({
         <DialogTrigger asChild>
           <Button
             variant={isFilterActive ? 'default' : 'outline'}
-            className="h-8 gap-1 px-2 text-xs sm:h-10 sm:gap-1.5 sm:px-3 sm:text-sm"
+            className={`h-8 gap-1 px-2 text-xs sm:h-10 sm:gap-1.5 sm:px-3 sm:text-sm ${className ?? ''}`}
             aria-label="Filter works"
           >
             <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4" />

@@ -1,6 +1,6 @@
 import { CalendarClock, Check, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Download, Edit2, ExternalLink, ImageIcon, Loader2, ListOrdered, Magnet, Search, SortAsc, TextCursorInput, User, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { MoreHorizontal, Plus } from 'lucide-react'
+import { Filter, MoreHorizontal, Plus, Trash2 } from 'lucide-react'
 import { strToU8, zipSync } from 'fflate'
 import { r18Api } from '@/api/r18'
 import { ActressDetail, ActressWork, DownloadQueueItem, NyaaResult } from '@/types/types'
@@ -257,6 +257,8 @@ export interface ActressWorksPanelProps {
   onQueueAll?: () => void
   queueAllLoading?: boolean
   onCancelDownload?: (contentId: string) => void
+  onDeleteSelected?: () => void
+  deletingSelected?: boolean
   onScheduleActress?: (detail: ActressDetail) => void
   onAddScraper?: (actressName: string) => void
   actressName?: string
@@ -302,6 +304,8 @@ export function ActressWorksPanel({
   onQueueAll,
   queueAllLoading,
   onCancelDownload,
+  onDeleteSelected,
+  deletingSelected = false,
   onScheduleActress,
   onAddScraper,
   actressName,
@@ -651,7 +655,7 @@ export function ActressWorksPanel({
           ) : (
             <p className="text-sm text-muted-foreground flex-1">Actress not found.</p>
           )}
-          <div className="flex w-full items-center justify-start gap-3 sm:contents">
+          <div className="hidden w-full items-center justify-start gap-3 2xl:contents">
             <div className="flex items-center gap-1.5 shrink-0 sm:gap-2">
               <ImageIcon className="h-4 w-4 text-muted-foreground hidden sm:block" aria-hidden />
               <Label htmlFor="show-work-covers" className="text-xs text-muted-foreground sm:not-sr-only">
@@ -677,7 +681,7 @@ export function ActressWorksPanel({
               />
             </div>
           </div>
-          <div className="flex w-full items-center gap-2 sm:contents">
+          <div className="flex items-center gap-2 sm:ml-auto">
             <div className="inline-flex rounded-md shadow-sm shrink-0">
               <DropdownMenu open={sortOpen} onOpenChange={setSortOpen}>
                 <DropdownMenuTrigger asChild>
@@ -696,7 +700,7 @@ export function ActressWorksPanel({
               </DropdownMenu>
               <Button
                 variant="outline"
-                className={`h-9 w-full rounded-l-none border-l-0 px-2 text-sm sm:h-10 sm:w-auto sm:px-3 ${focuslessOutlineButtonClass}`}
+                className={`h-9 w-auto rounded-l-none border-l-0 px-2 text-sm sm:h-10 sm:px-3 ${focuslessOutlineButtonClass}`}
                 onClick={() => { onSortChange(sortBy, sortDir === 'asc' ? 'desc' : 'asc'); onWorksPageChange(0) }}
               >
                 {sortDir === 'asc' ? '↑' : '↓'}
@@ -704,6 +708,7 @@ export function ActressWorksPanel({
               </Button>
             </div>
             <ActressWorksFilterDialog
+              className="hidden xl:inline-flex"
               isFilterActive={isActressWorksFilterActive(worksFilter)}
               open={filterOpen}
               onOpenChange={setFilterOpen}
@@ -719,7 +724,7 @@ export function ActressWorksPanel({
                   <Button
                     variant="outline"
                     size="sm"
-                    className={`ml-auto h-9 shrink-0 gap-1.5 text-sm sm:hidden ${focuslessOutlineButtonClass}`}
+                    className={`h-9 shrink-0 gap-1.5 text-sm sm:hidden ${focuslessOutlineButtonClass}`}
                     aria-label="More actions"
                   >
                     <MoreHorizontal className="h-4 w-4" />
@@ -727,6 +732,20 @@ export function ActressWorksPanel({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem className="cursor-pointer xl:hidden" onClick={() => { setFilterOpen(true); setMobileMoreOpen(false) }}>
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filter{isActressWorksFilterActive(worksFilter) ? ' (Active)' : ''}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer" onSelect={(event) => event.preventDefault()}>
+                    <ImageIcon className="mr-2 h-4 w-4" />
+                    Covers
+                    <Switch className="ml-auto" checked={showCovers} onCheckedChange={onToggleCovers} aria-label="Show work cover images" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer" onSelect={(event) => event.preventDefault()}>
+                    <TextCursorInput className="mr-2 h-4 w-4" />
+                    Titles
+                    <Switch className="ml-auto" checked={showTitles} onCheckedChange={onToggleTitles} aria-label="Show work titles" />
+                  </DropdownMenuItem>
                   {onQueueAll && (
                     <DropdownMenuItem
                       className="cursor-pointer"
@@ -793,7 +812,7 @@ export function ActressWorksPanel({
             <Button
               variant="outline"
               size="sm"
-              className={`hidden shrink-0 h-9 gap-1.5 text-sm sm:flex sm:h-10 ${focuslessOutlineButtonClass}`}
+              className={`hidden shrink-0 h-9 gap-1.5 text-sm 2xl:flex 2xl:h-10 ${focuslessOutlineButtonClass}`}
               disabled={queueAllLoading}
               onClick={onQueueAll}
             >
@@ -857,9 +876,23 @@ export function ActressWorksPanel({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem className="cursor-pointer xl:hidden" onClick={() => { setFilterOpen(true); setDesktopMoreOpen(false) }}>
+                  <Filter className="mr-2 h-4 w-4" />
+                  Filter{isActressWorksFilterActive(worksFilter) ? ' (Active)' : ''}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer 2xl:hidden" onSelect={(event) => event.preventDefault()}>
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  Covers
+                  <Switch className="ml-auto" checked={showCovers} onCheckedChange={onToggleCovers} aria-label="Show work cover images" />
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer 2xl:hidden" onSelect={(event) => event.preventDefault()}>
+                  <TextCursorInput className="mr-2 h-4 w-4" />
+                  Titles
+                  <Switch className="ml-auto" checked={showTitles} onCheckedChange={onToggleTitles} aria-label="Show work titles" />
+                </DropdownMenuItem>
                 {onQueueAll && (
                   <DropdownMenuItem
-                    className="cursor-pointer sm:hidden"
+                    className="cursor-pointer 2xl:hidden"
                     disabled={queueAllLoading}
                     onClick={() => {
                       onQueueAll()
@@ -1046,6 +1079,18 @@ export function ActressWorksPanel({
               >
                 <Download className="h-4 w-4" />
                 Queue
+              </Button>
+            )}
+            {onDeleteSelected && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="h-9 gap-1.5 text-sm"
+                disabled={deletingSelected}
+                onClick={onDeleteSelected}
+              >
+                <Trash2 className="h-4 w-4" />
+                {deletingSelected ? 'Deleting...' : 'Delete Video'}
               </Button>
             )}
             </div>

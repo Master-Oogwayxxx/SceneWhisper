@@ -11,7 +11,7 @@ from ..api.tasks import task_manager
 from ..crud.setting import get_settings, patch_settings
 from ..crud.download_queue import get_processing_items
 from ..schemas.db_helper import DB_PATH, SessionLocal
-from ..schemas.setting import DEFAULT_EXTERNAL_VIDEO_TARGETS, DEFAULT_PROCESSING_HOURS_WINDOWS, DEFAULT_SCRAPER_TEMPLATES
+from ..schemas.setting import DEFAULT_EXTERNAL_VIDEO_TARGETS, DEFAULT_PROCESSING_HOURS_WINDOWS, DEFAULT_SCRAPER_TEMPLATES, DEFAULT_METADATA_SCRAPER_TEMPLATES
 from ..utils import calculate_next_run, utc_isoformat
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -24,6 +24,9 @@ _JSON_FIELDS = {
     "scraper_templates",
     "actress_favorites",
     "processing_hours_windows",
+    "metadata_scraper_config",
+    "metadata_scraper_templates",
+    "metadata_scraper_actress_urls",
 }
 _JSON_FIELD_DEFAULTS = {
     "ignore_patterns": [],
@@ -33,6 +36,9 @@ _JSON_FIELD_DEFAULTS = {
     "scraper_templates": json.loads(DEFAULT_SCRAPER_TEMPLATES),
     "actress_favorites": [],
     "processing_hours_windows": json.loads(DEFAULT_PROCESSING_HOURS_WINDOWS),
+    "metadata_scraper_config": {},
+    "metadata_scraper_templates": json.loads(DEFAULT_METADATA_SCRAPER_TEMPLATES),
+    "metadata_scraper_actress_urls": {},
 }
 _GENERIC_SETTINGS_EXCLUDED_FIELDS = {"actress_favorites"}
 _APP_TORRENT_TABLES = (

@@ -48,3 +48,13 @@ class ScrapedVideoRecord(Base):
     scraped_at = Column(DateTime, nullable=False)
     first_seen_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ScrapedVideoActressRecord(Base):
+    """User-owned assignment of scraped metadata to an R18 actress."""
+
+    __tablename__ = "scraped_video_actresses"
+
+    scraped_video_id = Column(String, primary_key=True, index=True)
+    actress_id = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

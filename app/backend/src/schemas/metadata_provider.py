@@ -66,10 +66,8 @@ def active_provider(db_path: Path, r18_path: Path) -> tuple[str, Path]:
     try:
         conn = sqlite3.connect(db_path)
         row = conn.execute("SELECT metadata_provider FROM settings WHERE id = 1").fetchone()
-        provider = row[0] if row and row[0] in {"r18", "japanese_adult_video_metadata"} else "r18"
+        provider = "r18"
         conn.close()
     except sqlite3.Error:
         pass
-    if provider == "japanese_adult_video_metadata":
-        return provider, r18_path.parent / "japanese-adult-video-metadata.db"
-    return provider, r18_path
+    return "r18", r18_path

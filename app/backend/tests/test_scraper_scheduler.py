@@ -46,6 +46,28 @@ def test_discover_page_links_keeps_same_site_pagination_only():
     ]
 
 
+def test_discover_page_links_supports_ipage_and_aria_navigation():
+    html = """
+    <ul class="pagination justify-content-center ft-wpbs mb-4">
+      <li class="page-item active"><span class="page-link"><span class="sr-only">Current Page </span>1</span></li>
+      <li class="page-item"><a class="page-link" href="https://www.javdatabase.com/idols/julia/?ipage=2"><span class="sr-only">Page </span>2</a></li>
+      <li class="page-item"><a class="page-link" href="https://www.javdatabase.com/idols/julia/?ipage=3"><span class="sr-only">Page </span>3</a></li>
+      <li class="page-item"><a class="page-link" href="https://www.javdatabase.com/idols/julia/?ipage=2" aria-label="Next Page">›</a></li>
+      <li class="page-item"><a class="page-link" href="https://www.javdatabase.com/idols/julia/?ipage=59" aria-label="Last Page">»</a></li>
+    </ul>
+    """
+
+    source_url = "https://www.javdatabase.com/idols/julia/"
+    links = scraper_scheduler.discover_page_links(html, source_url, source_url)
+
+    assert links == [
+        "https://www.javdatabase.com/idols/julia/?ipage=2",
+        "https://www.javdatabase.com/idols/julia/?ipage=3",
+        "https://www.javdatabase.com/idols/julia/?ipage=59",
+    ]
+    assert scraper_scheduler.estimate_total_pages(html, source_url, source_url) == 59
+
+
 def test_discover_page_links_keeps_pagination_within_source_page():
     html = """
     <a href="/models/yua-mikami?page=2">2</a>

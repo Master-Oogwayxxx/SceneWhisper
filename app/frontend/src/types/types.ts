@@ -525,7 +525,27 @@ export interface AppSettings {
   r18_auto_refresh_last_run: string | null
   r18_auto_refresh_next_run: string | null
   r18_auto_refresh_last_error: string | null
-  metadata_provider: 'r18' | 'japanese_adult_video_metadata'
+  metadata_provider: 'r18'
+  metadata_scraper_config: MetadataScraperConfig
+  metadata_scraper_templates: MetadataScraperTemplate[]
+  metadata_scraper_actress_urls: Record<string, string>
+}
+
+export interface MetadataScraperConfig {
+  site_name: string
+  base_url: string
+  movie_url: string
+  actress_url: string
+  listing_url: string
+  pagination: string
+  requires_access: boolean
+  available_fields: string[]
+  selectors: string
+}
+
+export interface MetadataScraperTemplate {
+  label: string
+  config: MetadataScraperConfig
 }
 
 export interface ExternalVideoTarget {
@@ -631,6 +651,7 @@ export interface ActressSummary {
 
 export interface ActressWork {
   content_id: string
+  metadata_source?: 'r18' | 'scraped' | 'merged'
   dvd_id?: string | null
   video_code?: string | null
   title_en?: string | null

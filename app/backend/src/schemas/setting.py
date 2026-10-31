@@ -4,6 +4,7 @@ from .db_helper import Base
 
 DEFAULT_EXTERNAL_VIDEO_TARGETS = '[{"label":"Google","url_template":"https://www.google.com/search?q={videoCode}"}]'
 DEFAULT_SCRAPER_TEMPLATES = '[{"label":"JavPlayer","url_template":"https://javplayer.org/model/{actress_name}"}]'
+DEFAULT_METADATA_SCRAPER_TEMPLATES = '[]'
 DEFAULT_PROCESSING_HOURS_WINDOWS = '{"mon":{"start":2,"end":19},"tue":{"start":2,"end":19},"wed":{"start":2,"end":19},"thu":{"start":2,"end":19},"fri":{"start":2,"end":19},"sat":{"start":2,"end":19},"sun":{"start":2,"end":19}}'
 
 
@@ -95,6 +96,8 @@ class SettingRecord(Base):
     r18_auto_refresh_next_run = Column(String, nullable=True)
     r18_auto_refresh_last_error = Column(Text, nullable=True)
     metadata_provider = Column(String, nullable=False, default="r18")
+    metadata_scraper_config = Column(Text, nullable=True)
+    metadata_scraper_actress_urls = Column(Text, nullable=True)
 
     # qBittorrent
     qbittorrent_url = Column(String, nullable=False, default="")

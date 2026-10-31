@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Query, Response
 
 from ..crud import scraper as scraper_crud
-from ..models.models import ScrapedVideosResponse, ScraperOpenedVideosRequest, ScraperRunRequest, ScraperRunResponse, ScraperSource
+from ..models.models import ScrapedVideoActressAssignment, ScrapedVideosResponse, ScraperOpenedVideosRequest, ScraperRunRequest, ScraperRunResponse, ScraperSource
 from ..models.notification import NotificationType
 from ..notification_service import emit_notification
 from ..utils import calculate_next_run, utc_isoformat
@@ -153,3 +153,10 @@ async def mark_videos_opened(body: ScraperOpenedVideosRequest):
     loop = asyncio.get_running_loop()
     updated = await loop.run_in_executor(None, scraper_crud.mark_videos_opened, body.ids)
     return {"updated": updated}
+
+
+@router.post("/videos/actresses")
+async def assign_videos_to_actresses(body: ScrapedVideoActressAssignment):
+    loop = asyncio.get_running_loop()
+    added = await loop.run_in_executor(None, scraper_crud.assign_videos_to_actresses, body.video_ids, body.actress_ids)
+    return {"assigned": added}

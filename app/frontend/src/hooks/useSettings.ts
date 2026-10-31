@@ -112,6 +112,12 @@ const DEFAULTS: AppSettings = {
   r18_auto_refresh_next_run: null,
   r18_auto_refresh_last_error: null,
   metadata_provider: 'r18',
+  metadata_scraper_config: {
+    site_name: '', base_url: '', movie_url: '', actress_url: '', listing_url: '', pagination: '',
+    requires_access: false, available_fields: [], selectors: '',
+  },
+  metadata_scraper_templates: [],
+  metadata_scraper_actress_urls: {},
 }
 
 export function useSettings() {

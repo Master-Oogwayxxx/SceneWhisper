@@ -44,6 +44,14 @@ async function readError(res: Response, fallback: string): Promise<Error> {
 }
 
 export const scraperApi = {
+  async assignVideosToActresses(videoIds: string[], actressIds: number[]): Promise<{ assigned: number }> {
+    const res = await fetch(`${API_BASE}/scraper/videos/actresses`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ video_ids: videoIds, actress_ids: actressIds }),
+    })
+    if (!res.ok) throw await readError(res, 'Failed to assign scraped videos')
+    return res.json()
+  },
   async getSources(): Promise<ScraperSource[]> {
     const res = await fetch(`${API_BASE}/scraper/sources`)
     if (!res.ok) throw await readError(res, 'Failed to load scraper sources')

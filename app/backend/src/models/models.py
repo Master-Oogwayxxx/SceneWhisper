@@ -259,6 +259,11 @@ class ScraperOpenedVideosRequest(BaseModel):
     ids: list[str]
 
 
+class ScrapedVideoActressAssignment(BaseModel):
+    video_ids: list[str]
+    actress_ids: list[int]
+
+
 class ScrapedVideosResponse(BaseModel):
     items: list[ScrapedVideo]
     total: int
@@ -492,6 +497,7 @@ class ActressSummary(BaseModel):
 
 class ActressWork(BaseModel):
     content_id: str
+    metadata_source: Literal['r18', 'scraped', 'merged'] = 'r18'
     dvd_id: Optional[str] = None
     video_code: Optional[str] = None
     title_en: Optional[str] = None

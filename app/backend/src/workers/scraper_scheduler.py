@@ -19,6 +19,7 @@ from ..utils import calculate_next_run, utc_isoformat
 VIDEO_CODE_RE = re.compile(r"\b([A-Z]{2,8}[-_]\d{2,6})(?:[-_](?:RM|SUB|UN))?\b", re.IGNORECASE)
 LINK_RE = re.compile(r"<a\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", re.IGNORECASE | re.DOTALL)
 REL_NEXT_RE = re.compile(r"\brel=[\"'][^\"']*\bnext\b[^\"']*[\"']", re.IGNORECASE)
+ARIA_LABEL_RE = re.compile(r"\baria-label=[\"']([^\"']+)[\"']", re.IGNORECASE)
 PAGE_PATH_RE = re.compile(r"/(?:page|p)/\d+/?$|/[^/]*\d+/?$", re.IGNORECASE)
 TRAILING_NUMBER_RE = re.compile(r"(\d+)(?:/)?$")
 PAGINATION_UL_RE = re.compile(r"<ul\b[^>]*class=[\"'][^\"']*\bpagination\b[^\"']*[\"'][^>]*>(.*?)</ul>", re.IGNORECASE | re.DOTALL)
@@ -224,14 +225,16 @@ def _is_within_source_page(candidate_url: str, source_url: str) -> bool:
 
 def _looks_like_pagination(href: str, label: str, attrs: str) -> bool:
     label_text = label.strip().lower()
-    if REL_NEXT_RE.search(attrs) or label_text in {"next", "next page", ">", ">>", "more"}:
+    aria_match = ARIA_LABEL_RE.search(attrs)
+    aria_label = aria_match.group(1).strip().lower() if aria_match else ""
+    if REL_NEXT_RE.search(attrs) or aria_label in {"next", "next page", "last", "last page"} or label_text in {"next", "next page", ">", ">>", "›", "»", "more"}:
         return True
-    if label_text.isdigit():
+    if label_text.isdigit() or re.search(r"\bpage\s+\d+\b", label_text):
         return True
 
     parsed = urlparse(href)
     query = parse_qs(parsed.query)
-    if any(name.lower() in {"page", "p", "pg", "paged"} for name in query):
+    if any(name.lower() in {"page", "p", "pg", "paged", "ipage"} for name in query):
         return True
     return bool(PAGE_PATH_RE.search(parsed.path))
 
@@ -259,7 +262,7 @@ def discover_page_links(page_html: str, current_url: str, source_url: str) -> li
 def _page_number_from_url(url: str) -> int | None:
     parsed = urlparse(url)
     query = parse_qs(parsed.query)
-    for key in ("page", "p", "pg", "paged"):
+    for key in ("page", "p", "pg", "paged", "ipage"):
         values = query.get(key) or query.get(key.upper())
         if values:
             try:

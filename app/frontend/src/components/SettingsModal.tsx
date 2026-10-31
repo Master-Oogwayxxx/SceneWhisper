@@ -19,8 +19,10 @@ import { Slider } from '@/components/ui/slider'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { Loader2, Trash2, ScanSearch, FolderSearch, Database, ChevronUp, ChevronDown, Maximize2, Minimize2, Plus, RotateCcw } from 'lucide-react'
-import { AppSettings, TaskStatus, DirectoryRecord } from '@/types/types'
+import { Loader2, Trash2, ScanSearch, FolderSearch, Database, ChevronUp, ChevronDown, Maximize2, Minimize2, Plus, RotateCcw, Pencil } from 'lucide-react'
+import { AppSettings, TaskStatus, DirectoryRecord, MetadataScraperTemplate } from '@/types/types'
+import { MetadataScraperDialog } from './MetadataScraperDialog'
+import { EMPTY_METADATA_SCRAPER_CONFIG } from '@/lib/metadata-scraper'
 import { SelectiveScanDialog } from '@/components/SelectiveScanDialog'
 import { SelectiveCleanupDialog } from '@/components/SelectiveCleanupDialog'
 import { SelectiveSrtCleanupDialog } from '@/components/SelectiveSrtCleanupDialog'
@@ -332,6 +334,11 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const srtCleanupEventSourceRef = useRef<EventSource | null>(null)
   const [externalVideoTargetsDraft, setExternalVideoTargetsDraft] = useState(() => settings.external_video_targets)
   const [scraperTemplatesDraft, setScraperTemplatesDraft] = useState(() => settings.scraper_templates)
+  const [metadataScraperTemplatesDraft, setMetadataScraperTemplatesDraft] = useState<MetadataScraperTemplate[]>(() => settings.metadata_scraper_templates ?? [])
+  const [metadataTemplateDialogOpen, setMetadataTemplateDialogOpen] = useState(false)
+  const [metadataTemplateDraft, setMetadataTemplateDraft] = useState(EMPTY_METADATA_SCRAPER_CONFIG)
+  const [metadataTemplateSelectors, setMetadataTemplateSelectors] = useState<Record<string, string>>({})
+  const [metadataTemplateEditIndex, setMetadataTemplateEditIndex] = useState<number | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   // Local state for editing processing hours (in user's timezone)
@@ -349,6 +356,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   useEffect(() => {
     setScraperTemplatesDraft(settings.scraper_templates)
   }, [settings.scraper_templates])
+
+  useEffect(() => {
+    setMetadataScraperTemplatesDraft(settings.metadata_scraper_templates ?? [])
+  }, [settings.metadata_scraper_templates])
 
   useEffect(() => {
     return () => {
@@ -819,6 +830,38 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     ]
     setScraperTemplatesDraft(next)
     patchSettings({ scraper_templates: next })
+  }
+
+  const removeMetadataScraperTemplate = (index: number) => {
+    const next = metadataScraperTemplatesDraft.filter((_, currentIndex) => currentIndex !== index)
+    setMetadataScraperTemplatesDraft(next)
+    patchSettings({ metadata_scraper_templates: next })
+  }
+
+  const addMetadataScraperTemplate = () => {
+    setMetadataTemplateEditIndex(null)
+    setMetadataTemplateDraft(EMPTY_METADATA_SCRAPER_CONFIG)
+    setMetadataTemplateSelectors({})
+    setMetadataTemplateDialogOpen(true)
+  }
+
+  const editMetadataScraperTemplate = (index: number) => {
+    const template = metadataScraperTemplatesDraft[index]
+    if (!template) return
+    setMetadataTemplateEditIndex(index)
+    setMetadataTemplateDraft({ ...template.config, available_fields: [...template.config.available_fields] })
+    try { setMetadataTemplateSelectors(JSON.parse(template.config.selectors || '{}') as Record<string, string>) } catch { setMetadataTemplateSelectors({}) }
+    setMetadataTemplateDialogOpen(true)
+  }
+
+  const saveMetadataTemplateFromSettings = (label: string, config: MetadataScraperTemplate['config']) => {
+    const next = [...metadataScraperTemplatesDraft]
+    const template = { label, config }
+    if (metadataTemplateEditIndex === null) next.push(template)
+    else next[metadataTemplateEditIndex] = template
+    setMetadataScraperTemplatesDraft(next)
+    patchSettings({ metadata_scraper_templates: next })
+    toast.success(`Saved scraper template: ${label}`)
   }
 
   const isBusy = isScanning || isCleaningStream || isDeletingSrts
@@ -1340,15 +1383,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         onCheckedChange={(v) => patchSettings({ show_actress_work_titles: v })}
                       />
                     </SettingRow>
-                    <SettingRow label="Actress metadata source" description="Choose which indexed metadata database powers the Actresses tab. Changing this may require reloading the tab.">
-                      <Select value={settings.metadata_provider} onValueChange={(value) => { patchSettings({ metadata_provider: value as 'r18' | 'japanese_adult_video_metadata' }); void queryClient.invalidateQueries({ queryKey: ['r18'] }) }}>
-                        <SelectTrigger className="w-full sm:w-[260px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="r18">R18.dev</SelectItem>
-                          <SelectItem value="japanese_adult_video_metadata">Japanese Adult Video Metadata</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </SettingRow>
                     <div className="flex flex-col gap-2.5 py-2.5 sm:gap-3 sm:py-3">
                       <div>
                         <Label className="text-xs font-medium sm:text-sm">External video code links</Label>
@@ -1420,6 +1454,40 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                             Add Link
                           </Button>
                         </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2.5 py-2.5 sm:gap-3 sm:py-3">
+                      <div>
+                        <Label className="text-xs font-medium sm:text-sm">Metadata scraper templates</Label>
+                        <p className={compactHelpTextClass}>Reusable field and selector configurations for actress metadata scraping. Configure new templates from the actress scraper dialog.</p>
+                      </div>
+                      {metadataScraperTemplatesDraft.length === 0 ? (
+                        <p className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">No metadata scraper templates saved yet.</p>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {metadataScraperTemplatesDraft.map((template, index) => (
+                            <div key={`${template.label}-${index}`} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium">{template.label || `Template ${index + 1}`}</p>
+                                <p className="text-xs text-muted-foreground">{template.config.available_fields.length} fields configured</p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                              <Button type="button" variant="outline" size="icon" className={compactIconButtonClass} onClick={() => editMetadataScraperTemplate(index)} aria-label={`Edit metadata scraper template ${template.label || index + 1}`}>
+                                <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                              </Button>
+                              <Button type="button" variant="outline" size="icon" className={compactIconButtonClass} onClick={() => removeMetadataScraperTemplate(index)} aria-label={`Remove metadata scraper template ${template.label || index + 1}`}>
+                                <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                              </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex justify-end">
+                        <Button type="button" variant="outline" size="sm" className={compactButtonClass} onClick={addMetadataScraperTemplate}>
+                          <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          Add Scraper
+                        </Button>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2.5 py-2.5 sm:gap-3 sm:py-3">
@@ -1840,6 +1908,23 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         setSelectedDirs={setSelectedDirs}
         onSaveSelection={saveSrtCleanupSelection}
         onStartSrtCleanup={startSelectiveSrtCleanup}
+      />
+
+      <MetadataScraperDialog
+        open={metadataTemplateDialogOpen}
+        onOpenChange={setMetadataTemplateDialogOpen}
+        detail={null}
+        actressUrl=""
+        onActressUrlChange={() => undefined}
+        config={metadataTemplateDraft}
+        onConfigChange={setMetadataTemplateDraft}
+        selectors={metadataTemplateSelectors}
+        onSelectorsChange={setMetadataTemplateSelectors}
+        templates={metadataScraperTemplatesDraft}
+        onSaveTemplate={saveMetadataTemplateFromSettings}
+        onSave={() => undefined}
+        templateLabel={metadataTemplateEditIndex === null ? '' : metadataScraperTemplatesDraft[metadataTemplateEditIndex]?.label}
+        templateOnly
       />
     </>
   )

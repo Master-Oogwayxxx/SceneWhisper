@@ -708,10 +708,7 @@ export const Dashboard = ({ tab, setTab, statsMinimized, highlightedTaskId, high
             </TabsContent>
 
             <TabsContent value="actresses" className={`${tab === 'actresses' ? 'h-full flex flex-col m-0 overflow-hidden' : 'flex-1 overflow-hidden mt-0'}`}>
-              <ActressTab onAddScraper={(actressName) => {
-                setPendingScraperActressName(actressName)
-                setTab('scraper')
-              }} />
+              <ActressTab />
             </TabsContent>
 
             <TabsContent value="scraper" className={`${tab === 'scraper' ? 'h-full flex flex-col m-0 overflow-hidden' : 'flex-1 overflow-hidden mt-0'}`}>

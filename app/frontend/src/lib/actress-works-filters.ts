@@ -20,6 +20,8 @@ export type ActressWorkResolutionFilter =
   | '1440p'
   | '4k'
 
+export type ActressWorkMetadataSourceFilter = 'r18' | 'merged' | 'scraped'
+
 export interface ActressWorksFilterState {
   fileExists: boolean | null // null = no filter; true = local file found; false = not found
   localFileStatus: ActressWorkLocalFileStatusFilter | null
@@ -31,6 +33,7 @@ export interface ActressWorksFilterState {
   openedSite: string | null
   releaseYear: number | null // null = no filter; 4-digit year otherwise
   torrentStatus: ActressWorkTorrentStatusFilter | null
+  metadataSource: ActressWorkMetadataSourceFilter | null
 }
 
 export const EMPTY_ACTRESS_WORKS_FILTER_STATE: ActressWorksFilterState = {
@@ -44,10 +47,20 @@ export const EMPTY_ACTRESS_WORKS_FILTER_STATE: ActressWorksFilterState = {
   openedSite: null,
   releaseYear: null,
   torrentStatus: null,
+  metadataSource: null,
 }
 
 export function isActressWorksFilterActive(f: ActressWorksFilterState): boolean {
-  return f.fileExists !== null || f.localFileStatus !== null || f.uncensored !== null || f.censored !== null || f.subtitled !== null || f.resolution !== null || f.opened !== null || f.openedSite !== null || f.releaseYear !== null || f.torrentStatus !== null
+  return f.fileExists !== null || f.localFileStatus !== null || f.uncensored !== null || f.censored !== null || f.subtitled !== null || f.resolution !== null || f.opened !== null || f.openedSite !== null || f.releaseYear !== null || f.torrentStatus !== null || f.metadataSource !== null
+}
+
+export function filterActressWorksByMetadataSource(works: ActressWork[], source: ActressWorkMetadataSourceFilter | null): ActressWork[] {
+  if (source === null) return works
+  return works.filter((work) => {
+    const metadataSource = work.metadata_source ?? 'r18'
+    if (source === 'r18') return metadataSource === 'r18' || metadataSource === 'merged'
+    return metadataSource === source
+  })
 }
 
 export function filterActressWorksByOpenedSite(works: ActressWork[], site: string | null): ActressWork[] {

@@ -19,6 +19,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..crud import r18_actress
+from ..crud import scraper as scraper_crud
 from ..crud.download_queue import clear_done as clear_done_queue
 from ..crud.download_queue import delete_queue_item, enqueue_works, get_all_queue, get_failed_torrent_urls, mark_processing_by_content_id, retry_queue_item
 from ..crud.torrent_tracking import (
@@ -39,9 +40,6 @@ from ..schemas.actress_work_file_state import ActressWorkFileStateRecord
 from ..schemas.download_queue import DownloadQueueRecord
 from ..schemas.file import FileRecord
 from ..schemas.r18_db import R18_DB_PATH, ensure_r18_indexes, get_import_status, r18_db_ready, read_metadata, save_uploaded_gz, schedule_import_from_url, schedule_import_r18_sql_gz
-from ..schemas.metadata_provider import active_provider, refresh_metadata_database
-from ..schemas.db_helper import DB_PATH
-from ..schemas.metadata_provider import active_provider, refresh_metadata_database
 from ..utils.qbit import delete_torrent as _delete_torrent
 from ..utils.qbit import find_torrent_hash_by_name as _find_torrent_hash
 from ..utils.qbit import send_to_qbit as _send_to_qbit
@@ -985,6 +983,33 @@ async def list_actress_works(
             content_ids_exclude=content_ids_exclude,
         ),
     )
+    scraped_rows = await loop.run_in_executor(None, scraper_crud.list_videos_for_actress, actress_id)
+    if scraped_rows:
+        existing_by_code = {
+            str(work.get("video_code") or work.get("content_id") or "").replace("-", "").upper(): work
+            for work in rows
+        }
+        scraped_only_count = 0
+        for scraped in scraped_rows:
+            code = scraped.videoCode or ""
+            key = code.replace("-", "").upper()
+            if key in existing_by_code:
+                existing_by_code[key]["metadata_source"] = "merged"
+            else:
+                scraped_only_count += 1
+                rows.append({
+                    "content_id": code,
+                    "dvd_id": code,
+                    "video_code": code,
+                    "title_en": scraped.title,
+                    "title_ja": scraped.title,
+                    "release_date": None,
+                    "image_url": None,
+                    "metadata_source": "scraped",
+                    "is_opened": False,
+                    "opened_sites": [],
+                })
+        total += scraped_only_count
     query_seconds = time.perf_counter() - query_started
     if total == 0:
         row = await loop.run_in_executor(None, lambda: r18_actress.get_actress(actress_id))
@@ -1121,19 +1146,6 @@ async def import_from_url(body: ImportFromUrlBody | None = None):
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.post("/metadata/refresh")
-async def refresh_metadata():
-    """Refresh the selected non-R18 metadata provider from its upstream JSON index."""
-    provider, db_path = active_provider(DB_PATH, R18_DB_PATH)
-    if provider != "japanese_adult_video_metadata":
-        raise HTTPException(status_code=409, detail="Select Japanese Adult Video Metadata before refreshing it.")
-    loop = asyncio.get_running_loop()
-    try:
-        await loop.run_in_executor(None, lambda: refresh_metadata_database(db_path))
-        return {"status": "completed", "provider": provider}
-    except Exception as exc:
-        logging.exception("Alternative metadata refresh failed")
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:
         logging.exception("R18 import-from-url failed")
         raise HTTPException(status_code=500, detail=str(exc)) from exc

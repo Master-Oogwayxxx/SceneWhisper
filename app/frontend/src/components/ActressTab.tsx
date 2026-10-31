@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, ChevronLeft, ChevronRight, Database, Download, ListOrdered, Loader2, RotateCcw, Search, Star, User } from 'lucide-react'
+import { CalendarClock, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Database, Download, ListOrdered, Loader2, Search, Star, User } from 'lucide-react'
 import { toast } from 'sonner'
-import { ActressDetail, ActressDownloadMonitor, ActressSummary, ActressWork, DownloadQueueItem, R18Status } from '@/types/types'
+import { ActressDetail, ActressDownloadMonitor, ActressSummary, ActressWork, DownloadQueueItem, MetadataScraperConfig, R18Status } from '@/types/types'
 import {
   useR18ActressDetail,
   useR18ActressSearch,
@@ -30,6 +30,8 @@ import { ActressWorksFilterState, EMPTY_ACTRESS_WORKS_FILTER_STATE, filterActres
 import { mergeSelectedWorks, toggleActressWorkSelection } from '@/lib/selected-works'
 import { useDownloads } from '@/hooks/useDownloads'
 import { formatActressName, useActressCustomNames } from '@/hooks/useActressCustomNames'
+import { EMPTY_METADATA_SCRAPER_CONFIG, MetadataScraperProgress, runMetadataScraper } from '@/lib/metadata-scraper'
+import { MetadataScraperDialog } from './MetadataScraperDialog'
 
 const PAGE_SIZE = 50
 import { API_BASE } from '@/api/client'
@@ -353,11 +355,7 @@ function ActressScheduleDialog({ open, onOpenChange, monitor, actressName, onSav
   )
 }
 
-interface ActressTabProps {
-  onAddScraper?: (actressName: string) => void
-}
-
-export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
+export const ActressTab = () => {
   const selectedActressQueryKey = 'actress'
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [searchDraft, setSearchDraft] = useState('')
@@ -393,7 +391,11 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
   const [worksFilter, setWorksFilter] = useState<ActressWorksFilterState>(EMPTY_ACTRESS_WORKS_FILTER_STATE)
   const [worksFilterDraft, setWorksFilterDraft] = useState<ActressWorksFilterState>(EMPTY_ACTRESS_WORKS_FILTER_STATE)
   const [importing, setImporting] = useState(false)
-  const [refreshingMetadata, setRefreshingMetadata] = useState(false)
+  const [scraperConfigOpen, setScraperConfigOpen] = useState(false)
+  const [actressUrlDraft, setActressUrlDraft] = useState('')
+  const [selectorDraft, setSelectorDraft] = useState<Record<string, string>>({})
+  const [scraperConfigDraft, setScraperConfigDraft] = useState<MetadataScraperConfig>(EMPTY_METADATA_SCRAPER_CONFIG)
+  const [metadataScraperProgress, setMetadataScraperProgress] = useState<MetadataScraperProgress | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [selectedWorks, setSelectedWorks] = useState<ActressWork[]>([])
@@ -431,7 +433,16 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
     data: worksResults,
     isLoading: worksLoading,
     isFetching: worksFetching,
-  } = useR18ActressWorks(selectedId, worksPage, worksPageSize, dbLoaded, worksSortBy, worksSortDir, worksSearch, worksFilter)
+  } = useR18ActressWorks(
+    selectedId,
+    0,
+    1000,
+    dbLoaded,
+    worksSortBy,
+    worksSortDir,
+    worksSearch,
+    worksFilter,
+  )
   const { importFile, importLatest } = useR18ImportMutations()
   const { settings, patchSettings } = useSettings()
   const queryClient = useQueryClient()
@@ -879,17 +890,56 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
     }
   }
 
-  const handleRefreshMetadata = async () => {
-    setRefreshingMetadata(true)
-    try {
-      await r18Api.refreshMetadata()
-      await queryClient.invalidateQueries({ queryKey: ['r18'] })
-      toast.success('Metadata refreshed')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Metadata refresh failed')
-    } finally {
-      setRefreshingMetadata(false)
+  const saveScraperConfig = async () => {
+    if (!detail || !actressUrlDraft.trim()) {
+      toast.error('Enter an actress page URL before adding the scraper')
+      return
     }
+    const actressUrls = { ...settings.metadata_scraper_actress_urls }
+    actressUrls[String(detail.id)] = actressUrlDraft.trim()
+    patchSettings({ metadata_scraper_config: { ...scraperConfigDraft, selectors: JSON.stringify(selectorDraft) }, metadata_scraper_actress_urls: actressUrls })
+    try {
+      let videoCount = 0
+      await runMetadataScraper({
+        actressId: detail.id,
+        actressName: formatActressName(detail, actressCustomNames),
+        actressUrl: actressUrlDraft.trim(),
+        onProgress: setMetadataScraperProgress,
+        onComplete: (count) => { videoCount = count },
+      })
+      setScraperConfigOpen(false)
+      toast.success(`Metadata scraper added: ${videoCount} scraped videos assigned`)
+      await queryClient.invalidateQueries({ queryKey: ['r18'] })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add metadata scraper')
+    } finally {
+      setMetadataScraperProgress(null)
+    }
+  }
+
+  const saveMetadataScraperTemplate = (label: string, config: MetadataScraperConfig) => {
+    const next = [...(settings.metadata_scraper_templates ?? []), { label, config: { ...config, selectors: JSON.stringify(selectorDraft) } }]
+    patchSettings({ metadata_scraper_templates: next })
+    toast.success(`Saved scraper template: ${label}`)
+  }
+
+  const openMetadataScraperConfig = () => {
+    const config = {
+      ...EMPTY_METADATA_SCRAPER_CONFIG,
+      ...settings.metadata_scraper_config,
+      available_fields: settings.metadata_scraper_config?.available_fields ?? [],
+    }
+    let selectors: Record<string, string> = {}
+    try { selectors = JSON.parse(config.selectors || '{}') as Record<string, string> } catch { selectors = {} }
+    setScraperConfigDraft(config)
+    setSelectorDraft(selectors)
+    const savedActressUrl = detail ? settings.metadata_scraper_actress_urls?.[String(detail.id)] ?? '' : ''
+    const defaultTemplateUrl = settings.metadata_scraper_templates?.[0]?.config.actress_url
+    const templateUrl = defaultTemplateUrl
+      ? defaultTemplateUrl.split('{actress_name}').join(encodeURIComponent(detail ? formatActressName(detail, actressCustomNames) : ''))
+      : ''
+    setActressUrlDraft(savedActressUrl || templateUrl)
+    setScraperConfigOpen(true)
   }
 
   const totalPages = favoritesOnly ? 0 : (searchResults ? Math.ceil(searchResults.total / PAGE_SIZE) : 0)
@@ -900,7 +950,7 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
     <div className="h-full flex flex-col gap-3 min-h-0">
       <div className="flex flex-col gap-2 shrink-0 sm:flex-row sm:items-center">
         <form
-          className="relative flex-1 min-w-0 p-1 sm:min-w-[200px] sm:max-w-md"
+          className="relative flex-1 min-w-0 p-1 sm:w-[min(100%,280px)] sm:flex-none"
           onSubmit={(e) => {
             e.preventDefault()
             if (debounceRef.current) clearTimeout(debounceRef.current)
@@ -920,34 +970,6 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
         </form>
 
         <div className="flex items-center gap-2 px-1 sm:px-0">
-          <Select
-            value={settings.metadata_provider}
-            onValueChange={(value) => {
-              patchSettings({ metadata_provider: value as 'r18' | 'japanese_adult_video_metadata' })
-              void queryClient.invalidateQueries({ queryKey: ['r18'] })
-            }}
-          >
-            <SelectTrigger className="h-8 w-[150px] text-xs sm:w-[210px] sm:text-sm" aria-label="Actress metadata source">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="r18">R18.dev</SelectItem>
-              <SelectItem value="japanese_adult_video_metadata">Japanese Adult Video Metadata</SelectItem>
-            </SelectContent>
-          </Select>
-          {settings.metadata_provider === 'japanese_adult_video_metadata' && (
-            <Button type="button" variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => void handleRefreshMetadata()} disabled={refreshingMetadata}>
-              <RotateCcw className={cn('h-3.5 w-3.5', refreshingMetadata && 'animate-spin')} />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-          )}
-          {status?.loaded && (
-            <Badge variant="secondary" className="h-8 gap-1 shrink-0">
-              <User className="h-3 w-3" />
-              {status.actress_count.toLocaleString()} loaded
-            </Badge>
-          )}
-
           <div className="ml-auto flex items-center gap-2 shrink-0 sm:hidden">
             <Button
               type="button"
@@ -1062,6 +1084,15 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
           </Button>
         </div>
       </div>
+      {metadataScraperProgress && (
+        <div className="space-y-2 rounded-md border border-border bg-card px-3 py-2 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="truncate">Scraping metadata{metadataScraperProgress.currentUrl ? `: ${metadataScraperProgress.currentUrl}` : ''}</span>
+            <span className="shrink-0 text-muted-foreground">{metadataScraperProgress.pagesScraped} / {metadataScraperProgress.totalPages || '?'} pages</span>
+          </div>
+          <Progress value={metadataScraperProgress.totalPages ? metadataScraperProgress.progress : undefined} className="h-2" aria-label="Metadata scraper progress" />
+        </div>
+      )}
 
       {(importing || status?.import_in_progress) && status && (
         <ImportStatusBanner status={status} />
@@ -1207,40 +1238,75 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
                 )}
               </div>
 
-              {totalPages > 1 && (
-                <div
-                  className={cn(
-                    'border-t border-border shrink-0',
-                    selectedId === null
-                      ? 'flex items-center justify-between px-3 py-2'
-                      : 'flex items-center justify-between gap-2 px-2 py-2'
-                  )}
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={cn(selectedId !== null && 'px-2')}
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => p - 1)}
-                  >
-                    {selectedId === null ? 'Previous' : <ChevronLeft className="h-4 w-4" />}
-                  </Button>
-                  <span className="min-w-0 flex-1 text-center text-xs text-muted-foreground">
-                    {selectedId === null ? `Page ${page + 1} of ${totalPages}` : `${page + 1}/${totalPages}`}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={cn(selectedId !== null && 'px-2')}
-                    disabled={page >= totalPages - 1}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    {selectedId === null ? 'Next' : <ChevronRight className="h-4 w-4" />}
-                  </Button>
-                </div>
-              )}
+              {totalPages > 1 && (() => {
+                const currentPage = page + 1
+                const maxVisiblePages = selectedId === null ? 5 : 3
+                let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2))
+                let endPage = startPage + maxVisiblePages - 1
+                if (endPage > totalPages) {
+                  startPage = Math.max(1, totalPages - maxVisiblePages + 1)
+                  endPage = totalPages
+                }
+                const pageNumbers = Array.from({ length: endPage - startPage + 1 }, (_, index) => startPage + index)
+
+                return (
+                  <div className="relative shrink-0 border-t border-border px-2 py-2">
+                    {selectedId !== null ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" disabled={currentPage === 1} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+                          Previous
+                        </Button>
+                        <span className="text-xs text-muted-foreground">{currentPage}/{totalPages}</span>
+                        <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" disabled={currentPage === totalPages} onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}>
+                          Next
+                        </Button>
+                      </div>
+                    ) : (
+                    <div className="scrollbar flex items-center justify-center gap-1 overflow-x-auto">
+                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === 1} onClick={() => setPage(0)} aria-label="First page">
+                      <ChevronFirst aria-hidden="true" />
+                    </Button>
+                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === 1} onClick={() => setPage((p) => Math.max(0, p - 1))} aria-label="Previous page">
+                      <ChevronLeft aria-hidden="true" />
+                    </Button>
+                    {startPage > 1 && (
+                      <>
+                        <Button type="button" variant="outline" size="sm" className="h-8 min-w-8 px-2" onClick={() => setPage(0)}>1</Button>
+                        {startPage > 2 && <span className="px-1 text-xs">...</span>}
+                      </>
+                    )}
+                    {pageNumbers.map((pageNumber) => (
+                      <Button
+                        key={pageNumber}
+                        type="button"
+                        variant={currentPage === pageNumber ? 'default' : 'outline'}
+                        size="sm"
+                        className="h-8 min-w-8 px-2"
+                        onClick={() => setPage(pageNumber - 1)}
+                      >
+                        {pageNumber}
+                      </Button>
+                    ))}
+                    {endPage < totalPages && (
+                      <>
+                        {endPage < totalPages - 1 && <span className="px-1 text-xs">...</span>}
+                        <Button type="button" variant="outline" size="sm" className="h-8 min-w-8 px-2" onClick={() => setPage(totalPages - 1)}>{totalPages}</Button>
+                      </>
+                    )}
+                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === totalPages} onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} aria-label="Next page">
+                      <ChevronRight aria-hidden="true" />
+                    </Button>
+                    <Button type="button" variant="outline" size="icon" className="h-8 w-8 shrink-0 text-foreground [&_svg]:h-4 [&_svg]:w-4" disabled={currentPage === totalPages} onClick={() => setPage(totalPages - 1)} aria-label="Last page">
+                      <ChevronLast aria-hidden="true" />
+                    </Button>
+                    </div>
+                    )}
+                    <span className={cn('pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 whitespace-nowrap text-xs text-muted-foreground', selectedId === null && 'sm:inline')}>
+                      {(favoritesOnly ? favoriteActresses.length : searchResults?.total ?? 0).toLocaleString()} actresses
+                    </span>
+                  </div>
+                )
+              })()}
             </div>
           )}
 
@@ -1327,7 +1393,7 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
                     queueAllLoading={queueAllLoading}
                     onCancelDownload={(contentId) => void handleCancelDownload(contentId)}
                     onScheduleActress={openCreateSchedule}
-                    onAddScraper={onAddScraper}
+                    onAddScraper={openMetadataScraperConfig}
                     actressName={detail ? formatActressName(detail, actressCustomNames) : undefined}
                     customActressName={detail ? actressCustomNames[detail.id] : undefined}
                     onCustomActressNameChange={setCustomActressName}
@@ -1423,14 +1489,12 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{settings.metadata_provider === 'r18' ? 'Load r18.dev dump' : 'Refresh actress metadata'}</DialogTitle>
+            <DialogTitle>Load r18.dev dump</DialogTitle>
             <DialogDescription>
-              {settings.metadata_provider === 'r18'
-                ? 'Choose whether to import a local dump file or download the latest dump from r18.dev.'
-                : 'Refresh the latest metadata from the selected upstream JSON index.'}
+              Choose whether to import a local dump file or download the latest dump from r18.dev.
             </DialogDescription>
           </DialogHeader>
-          {settings.metadata_provider === 'r18' ? <div className="grid gap-3 pt-2 sm:grid-cols-2">
+          <div className="grid gap-3 pt-2 sm:grid-cols-2">
             <button
               type="button"
               className="group flex min-w-0 flex-col items-start gap-2 rounded-md border border-input bg-background px-4 py-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
@@ -1459,15 +1523,28 @@ export const ActressTab = ({ onAddScraper }: ActressTabProps) => {
                 Fetch the current dump from `r18.dev` and start the import automatically.
               </span>
             </button>
-          </div> : <div className="pt-2"><Button type="button" className="w-full" onClick={() => void handleRefreshMetadata()} disabled={refreshingMetadata}>
-            <RotateCcw className={cn('mr-2 h-4 w-4', refreshingMetadata && 'animate-spin')} /> Refresh now
-          </Button></div>}
+          </div>
           <R18AutoRefreshSection
             settings={settings}
             onPatch={(updates) => patchSettings(updates)}
           />
         </DialogContent>
       </Dialog>
+      <MetadataScraperDialog
+        open={scraperConfigOpen}
+        onOpenChange={setScraperConfigOpen}
+        detail={detail}
+        actressName={detail ? formatActressName(detail, actressCustomNames) : undefined}
+        actressUrl={actressUrlDraft}
+        onActressUrlChange={setActressUrlDraft}
+        config={scraperConfigDraft}
+        onConfigChange={setScraperConfigDraft}
+        templates={settings.metadata_scraper_templates ?? []}
+        onSaveTemplate={saveMetadataScraperTemplate}
+        selectors={selectorDraft}
+        onSelectorsChange={setSelectorDraft}
+        onSave={() => void saveScraperConfig()}
+      />
     </div>
   )
 }

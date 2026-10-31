@@ -12,7 +12,7 @@ from sqlalchemy import func, inspect, or_, text
 from ..models.models import Schedule, ScrapedVideo, ScraperSource
 from ..schemas.db_helper import close_db, get_db
 from ..schemas.file import FileRecord
-from ..schemas.scraper import ScrapedVideoRecord, ScraperSourceRecord
+from ..schemas.scraper import ScrapedVideoActressRecord, ScrapedVideoRecord, ScraperSourceRecord
 from ..utils import utc_isoformat
 
 UNCENSORED_RE = re.compile(r"\b(?:uncensored|un(?:cen)?|uc)\b", re.IGNORECASE)
@@ -33,6 +33,48 @@ def _parse_dt(value: Optional[str]) -> Optional[datetime]:
 
 def normalize_scraper_url(url: str | None) -> str:
     return (url or "").strip().rstrip("/")
+
+
+def assign_videos_to_actresses(video_ids: list[str], actress_ids: list[int]) -> int:
+    video_ids = list(dict.fromkeys(video_ids))
+    actress_ids = list(dict.fromkeys(actress_ids))
+    if not video_ids or not actress_ids:
+        return 0
+    db = get_db()
+    try:
+        existing = {
+            (row.scraped_video_id, row.actress_id)
+            for row in db.query(ScrapedVideoActressRecord).filter(
+                ScrapedVideoActressRecord.scraped_video_id.in_(video_ids),
+                ScrapedVideoActressRecord.actress_id.in_(actress_ids),
+            ).all()
+        }
+        added = 0
+        for video_id in video_ids:
+            for actress_id in actress_ids:
+                if (video_id, actress_id) in existing:
+                    continue
+                db.add(ScrapedVideoActressRecord(scraped_video_id=video_id, actress_id=actress_id))
+                added += 1
+        db.commit()
+        return added
+    finally:
+        close_db(db)
+
+
+def list_videos_for_actress(actress_id: int) -> list[ScrapedVideo]:
+    db = get_db()
+    try:
+        rows = (
+            db.query(ScrapedVideoRecord)
+            .join(ScrapedVideoActressRecord, ScrapedVideoActressRecord.scraped_video_id == ScrapedVideoRecord.id)
+            .filter(ScrapedVideoActressRecord.actress_id == actress_id)
+            .order_by(ScrapedVideoRecord.scraped_at.desc())
+            .all()
+        )
+        return [video_to_model(row) for row in rows]
+    finally:
+        close_db(db)
 
 
 def video_id(source_id: str, video_code: str, source_url: str | None = None, video_url: str | None = None) -> str:
@@ -449,8 +491,18 @@ def _video_codes_on_disk_or_db(
     if not codes:
         return set()
 
-    filters = [FileRecord.name.ilike(f"%{code}%") for code in codes]
-    rows = db.query(FileRecord.name, FileRecord.path, FileRecord.is_deleted, FileRecord.height).filter(or_(*filters)).all()
+    # Keep each SQLite expression tree below its maximum depth. A large scrape
+    # can contain more than 1,000 codes, and one OR clause per code fails before
+    # SQLite can execute the query.
+    rows = []
+    for start in range(0, len(codes), 250):
+        code_batch = codes[start:start + 250]
+        filters = [FileRecord.name.ilike(f"%{code}%") for code in code_batch]
+        rows.extend(
+            db.query(FileRecord.name, FileRecord.path, FileRecord.is_deleted, FileRecord.height)
+            .filter(or_(*filters))
+            .all()
+        )
 
     found: set[tuple[str, bool, str | None]] = set()
     for name, path, is_deleted, height in rows:

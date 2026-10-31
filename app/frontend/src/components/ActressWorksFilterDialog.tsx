@@ -3,7 +3,7 @@ import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog'
 import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
-import { ActressWorksFilterState, ActressWorkLocalFileStatusFilter, ActressWorkResolutionFilter, ActressWorkTorrentStatusFilter } from '@/lib/actress-works-filters'
+import { ActressWorksFilterState, ActressWorkLocalFileStatusFilter, ActressWorkResolutionFilter, ActressWorkTorrentStatusFilter, ActressWorkMetadataSourceFilter } from '@/lib/actress-works-filters'
 
 const CURRENT_YEAR = new Date().getFullYear()
 const YEAR_OPTIONS = Array.from({ length: 15 }, (_, i) => CURRENT_YEAR - i)
@@ -172,6 +172,18 @@ export function ActressWorksFilterDialog({
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   {TORRENT_STATUS_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2 flex flex-col gap-3 border-t pt-4">
+              <Label className="text-sm font-medium">Metadata source</Label>
+              <Select value={draft.metadataSource ?? 'all'} onValueChange={(v) => onDraftChange({ metadataSource: v === 'all' ? null : v as ActressWorkMetadataSourceFilter })}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All metadata</SelectItem>
+                  <SelectItem value="r18">R18</SelectItem>
+                  <SelectItem value="merged">R18 + metadata scraper</SelectItem>
+                  <SelectItem value="scraped">Metadata scraper</SelectItem>
                 </SelectContent>
               </Select>
             </div>

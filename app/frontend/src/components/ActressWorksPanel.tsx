@@ -25,7 +25,7 @@ import { useDownloads } from '@/hooks/useDownloads'
 import { r18Keys } from '@/hooks/useR18'
 import { useSettings } from '@/hooks/useSettings'
 import { ActressWorksFilterDialog } from './ActressWorksFilterDialog'
-import { ActressWorksFilterState, filterActressWorksByOpenedSite, filterActressWorksByOpenedState, isActressWorksFilterActive } from '@/lib/actress-works-filters'
+import { ActressWorksFilterState, filterActressWorksByMetadataSource, filterActressWorksByOpenedSite, filterActressWorksByOpenedState, isActressWorksFilterActive } from '@/lib/actress-works-filters'
 import { buildExternalVideoTargetUrl, isValidExternalVideoTarget } from '@/lib/external-video-targets'
 import { resolveSelectedWorkLinks } from '@/lib/selected-work-links'
 import { useQueryClient } from '@tanstack/react-query'
@@ -314,9 +314,12 @@ export function ActressWorksPanel({
   const queryClient = useQueryClient()
   const queueMap = new Map((queueItems ?? []).map((q) => [q.content_id, q]))
   const filteredWorks = useMemo(
-    () => filterActressWorksByOpenedSite(filterActressWorksByOpenedState(works ?? [], worksFilter.opened), worksFilter.openedSite),
-    [works, worksFilter.opened, worksFilter.openedSite]
+    () => filterActressWorksByMetadataSource(filterActressWorksByOpenedSite(filterActressWorksByOpenedState(works ?? [], worksFilter.opened), worksFilter.openedSite), worksFilter.metadataSource),
+    [works, worksFilter.opened, worksFilter.openedSite, worksFilter.metadataSource]
   )
+  const displayedWorksTotal = worksFilter.metadataSource === null ? worksTotal : filteredWorks.length
+  const displayedWorksTotalPages = worksFilter.metadataSource === null ? worksTotalPages : Math.max(1, Math.ceil(filteredWorks.length / worksPageSize))
+  const pagedFilteredWorks = filteredWorks.slice(worksPage * worksPageSize, (worksPage + 1) * worksPageSize)
   const externalVideoTargets = useMemo(
     () => settings.external_video_targets.filter(isValidExternalVideoTarget),
     [settings.external_video_targets]
@@ -641,7 +644,7 @@ export function ActressWorksPanel({
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  {worksTotal.toLocaleString()} {worksTotal === 1 ? 'work' : 'works'}
+                  {displayedWorksTotal.toLocaleString()} {displayedWorksTotal === 1 ? 'work' : 'works'}
                 </p>
               </div>
             </>
@@ -762,7 +765,7 @@ export function ActressWorksPanel({
                       }}
                     >
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Scraper
+                      Run scraper
                     </DropdownMenuItem>
                   )}
                   {detail && (
@@ -821,7 +824,7 @@ export function ActressWorksPanel({
               onClick={() => onAddScraper(actressName)}
             >
               <Plus className="h-4 w-4" />
-              Add Scraper
+              Run scraper
             </Button>
           )}
           {showExpandedActions && detail && (
@@ -892,7 +895,7 @@ export function ActressWorksPanel({
                     }}
                   >
                     <Plus className="mr-2 h-4 w-4" />
-                    Add Scraper
+                    Run scraper
                   </DropdownMenuItem>
                 )}
                 {detail && (
@@ -1059,7 +1062,7 @@ export function ActressWorksPanel({
           </div>
         ) : filteredWorks.length > 0 ? (
           <div className={worksGridClass}>
-            {filteredWorks.map((work) => (
+            {pagedFilteredWorks.map((work) => (
               <ActressWorkCard
                 key={work.content_id}
                 work={work}
@@ -1085,10 +1088,10 @@ export function ActressWorksPanel({
         )}
       </div>
 
-      {worksTotalPages >= 1 && (
+            {displayedWorksTotalPages >= 1 && (
         <div className="flex-none flex flex-col gap-1.5 px-2 py-2 border-t border-border shrink-0 sm:px-3">
           <div className="grid grid-cols-1 items-center gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-            <div className="hidden items-center justify-center gap-2 sm:flex">
+            <div className="flex items-center justify-center gap-2">
               <span className="text-xs text-muted-foreground whitespace-nowrap sm:text-sm">Per page:</span>
               <Select
                 value={String(worksPageSize)}
@@ -1110,7 +1113,7 @@ export function ActressWorksPanel({
             <div className="flex min-w-0 items-center justify-center gap-1 sm:gap-2">
               <button
                 onClick={() => onWorksPageChange(0)}
-                className={`p-2 rounded-md border text-sm font-medium ${focuslessOutlineButtonClass} ${worksPage === 0 ? 'bg-muted cursor-not-allowed' : 'bg-transparent hover:bg-muted'}`}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border text-foreground text-sm font-medium ${focuslessOutlineButtonClass} ${worksPage === 0 ? 'bg-muted cursor-not-allowed' : 'bg-transparent hover:bg-muted'}`}
                 disabled={worksPage === 0 || worksLoading}
                 aria-label="First page"
               >
@@ -1118,7 +1121,7 @@ export function ActressWorksPanel({
               </button>
               <button
                 onClick={() => onWorksPageChange(Math.max(0, worksPage - 1))}
-                className={`p-2 rounded-md border text-sm font-medium ${focuslessOutlineButtonClass} ${worksPage === 0 ? 'bg-muted cursor-not-allowed' : 'bg-transparent hover:bg-muted'}`}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border text-foreground text-sm font-medium ${focuslessOutlineButtonClass} ${worksPage === 0 ? 'bg-muted cursor-not-allowed' : 'bg-transparent hover:bg-muted'}`}
                 disabled={worksPage === 0 || worksLoading}
                 aria-label="Previous page"
               >
@@ -1127,7 +1130,7 @@ export function ActressWorksPanel({
               <button
                 className={`min-w-9 rounded-md border bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground sm:hidden ${focuslessOutlineButtonClass}`}
                 disabled
-                aria-label={`Page ${worksPage + 1} of ${worksTotalPages}`}
+                aria-label={`Page ${worksPage + 1} of ${displayedWorksTotalPages}`}
               >
                 {worksPage + 1}
               </button>
@@ -1135,9 +1138,9 @@ export function ActressWorksPanel({
                 const maxVisible = 5
                 let start = Math.max(0, worksPage - Math.floor(maxVisible / 2))
                 let end = start + maxVisible - 1
-                if (end >= worksTotalPages) {
-                  start = Math.max(0, worksTotalPages - maxVisible)
-                  end = worksTotalPages - 1
+                if (end >= displayedWorksTotalPages) {
+                  start = Math.max(0, displayedWorksTotalPages - maxVisible)
+                  end = displayedWorksTotalPages - 1
                 }
                 const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i)
                 return (
@@ -1157,34 +1160,34 @@ export function ActressWorksPanel({
                         {p + 1}
                       </button>
                     ))}
-                    {end < worksTotalPages - 1 && (
+                    {end < displayedWorksTotalPages - 1 && (
                       <>
-                        {end < worksTotalPages - 2 && <span className="hidden px-3 py-1.5 text-sm sm:inline">...</span>}
-                        <button onClick={() => onWorksPageChange(worksTotalPages - 1)} className={`hidden px-3 py-1.5 rounded-md border text-sm font-medium sm:inline-flex ${focuslessOutlineButtonClass} bg-transparent hover:bg-muted`}>{worksTotalPages}</button>
+                        {end < displayedWorksTotalPages - 2 && <span className="hidden px-3 py-1.5 text-sm sm:inline">...</span>}
+                        <button onClick={() => onWorksPageChange(displayedWorksTotalPages - 1)} className={`hidden px-3 py-1.5 rounded-md border text-sm font-medium sm:inline-flex ${focuslessOutlineButtonClass} bg-transparent hover:bg-muted`}>{displayedWorksTotalPages}</button>
                       </>
                     )}
                   </>
                 )
               })()}
               <button
-                onClick={() => onWorksPageChange(Math.min(worksTotalPages - 1, worksPage + 1))}
-                className={`p-2 rounded-md border text-sm font-medium ${focuslessOutlineButtonClass} ${worksPage >= worksTotalPages - 1 ? 'bg-muted cursor-not-allowed' : 'bg-transparent hover:bg-muted'}`}
-                disabled={worksPage >= worksTotalPages - 1 || worksLoading}
+                onClick={() => onWorksPageChange(Math.min(displayedWorksTotalPages - 1, worksPage + 1))}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border text-foreground text-sm font-medium ${focuslessOutlineButtonClass} ${worksPage >= displayedWorksTotalPages - 1 ? 'bg-muted cursor-not-allowed' : 'bg-transparent hover:bg-muted'}`}
+                disabled={worksPage >= displayedWorksTotalPages - 1 || worksLoading}
                 aria-label="Next page"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
               <button
-                onClick={() => onWorksPageChange(worksTotalPages - 1)}
-                className={`p-2 rounded-md border text-sm font-medium ${focuslessOutlineButtonClass} ${worksPage >= worksTotalPages - 1 ? 'bg-muted cursor-not-allowed' : 'bg-transparent hover:bg-muted'}`}
-                disabled={worksPage >= worksTotalPages - 1 || worksLoading}
+                onClick={() => onWorksPageChange(displayedWorksTotalPages - 1)}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border text-foreground text-sm font-medium ${focuslessOutlineButtonClass} ${worksPage >= displayedWorksTotalPages - 1 ? 'bg-muted cursor-not-allowed' : 'bg-transparent hover:bg-muted'}`}
+                disabled={worksPage >= displayedWorksTotalPages - 1 || worksLoading}
                 aria-label="Last page"
               >
                 <ChevronLast className="w-4 h-4" />
               </button>
             </div>
             <div className="text-center text-xs text-muted-foreground whitespace-nowrap sm:text-right">
-              Showing {worksTotal === 0 ? 0 : worksPage * worksPageSize + 1}–{Math.min((worksPage + 1) * worksPageSize, worksTotal)} of {worksTotal.toLocaleString()} works
+              Showing {displayedWorksTotal === 0 ? 0 : worksPage * worksPageSize + 1}–{Math.min((worksPage + 1) * worksPageSize, displayedWorksTotal)} of {displayedWorksTotal.toLocaleString()} works
             </div>
           </div>
         </div>

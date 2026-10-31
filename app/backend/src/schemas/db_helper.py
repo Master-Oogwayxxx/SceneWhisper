@@ -805,6 +805,15 @@ def _ensure_scraper_tables() -> None:
             conn.execute(text("ALTER TABLE scraped_videos ADD COLUMN source_url TEXT"))
             logging.info("Migrated: added source_url column to scraped_videos")
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_scraped_videos_source_url ON scraped_videos (source_url)"))
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS scraped_video_actresses (
+                scraped_video_id TEXT NOT NULL,
+                actress_id INTEGER NOT NULL,
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY (scraped_video_id, actress_id)
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_scraped_video_actresses_actress_id ON scraped_video_actresses (actress_id)"))
         for name in ("uncensored", "censored", "subtitled"):
             if name not in video_cols:
                 conn.execute(text(f"ALTER TABLE scraped_videos ADD COLUMN {name} BOOLEAN"))
@@ -881,6 +890,15 @@ def _ensure_metadata_provider_column() -> None:
         columns = {row[1] for row in conn.execute(text("PRAGMA table_info(settings)"))}
         if "metadata_provider" not in columns:
             conn.execute(text("ALTER TABLE settings ADD COLUMN metadata_provider TEXT NOT NULL DEFAULT 'r18'"))
+            conn.commit()
+        if "metadata_scraper_config" not in columns:
+            conn.execute(text("ALTER TABLE settings ADD COLUMN metadata_scraper_config TEXT"))
+            conn.commit()
+        if "metadata_scraper_actress_urls" not in columns:
+            conn.execute(text("ALTER TABLE settings ADD COLUMN metadata_scraper_actress_urls TEXT"))
+            conn.commit()
+        if "metadata_scraper_templates" not in columns:
+            conn.execute(text("ALTER TABLE settings ADD COLUMN metadata_scraper_templates TEXT"))
             conn.commit()
 
 

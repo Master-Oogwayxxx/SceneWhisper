@@ -286,14 +286,13 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
       return
     }
 
-    const linksByVideo = selectedVideoCodes.map((videoCode) => {
-      const item = selectedItems.find((selectedItem) => selectedItem.videoCode === videoCode)
+    const linksByItem = selectedItems.map((item) => {
       return [
-        ...selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, videoCode)),
-        ...(includeOriginalUrl && item ? [item.url] : []),
+        ...selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, item.videoCode)),
+        ...(includeOriginalUrl && item.url ? [item.url] : []),
       ]
     })
-    const links = linksByVideo.flat()
+    const links = linksByItem.flat()
     const openedTabs = links.map(() => {
       const tab = window.open('about:blank', '_blank')
       if (!tab) {
@@ -310,8 +309,8 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
     })
 
     let linkIndex = 0
-    for (const videoLinks of linksByVideo) {
-      for (const link of videoLinks) {
+    for (const itemLinks of linksByItem) {
+      for (const link of itemLinks) {
         const tab = openedTabs[linkIndex]
         if (tab) {
           tab.location.href = link

@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useSettings } from '@/hooks/useSettings'
 import { buildExternalVideoTargetUrl, isValidExternalVideoTarget } from '@/lib/external-video-targets'
@@ -51,6 +52,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set())
   const [selectedExternalTargetKeys, setSelectedExternalTargetKeys] = useState<Set<string>>(() => new Set())
   const [includeOriginalUrl, setIncludeOriginalUrl] = useState(false)
+  const [openAllDuplicateCodes, setOpenAllDuplicateCodes] = useState(true)
   const [openedRowIds, setOpenedRowIds] = useState<Set<string>>(() => new Set())
 
   useEffect(() => {
@@ -97,6 +99,10 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
     [externalVideoTargets, selectedExternalTargetKeys]
   )
   const selectedItemRowIds = useMemo(() => selectedItems.map(pageRowId), [selectedItems])
+  const itemsToOpen = useMemo(
+    () => openAllDuplicateCodes ? selectedItems : selectPreferredItemsByVideoCode(selectedItems),
+    [openAllDuplicateCodes, selectedItems]
+  )
 
   useEffect(() => {
     const availableRowIds = new Set(items.map(pageRowId))
@@ -280,7 +286,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
       return
     }
 
-    const linksByItem = selectedItems.map((item) => {
+    const linksByItem = itemsToOpen.map((item) => {
       return [
         ...selectedExternalTargets.map((target) => buildExternalVideoTargetUrl(target, item.videoCode)),
         ...(includeOriginalUrl && item.url ? [item.url] : []),
@@ -496,6 +502,20 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
                   </DropdownMenuCheckboxItem>
                 ))}
                 <DropdownMenuSeparator />
+                <div className="flex items-center justify-between gap-3 px-2 py-1.5">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">Open all duplicate codes</div>
+                    <div className="text-xs text-muted-foreground">
+                      {openAllDuplicateCodes ? 'Open every selected row' : 'Open one per code, preferring uncensored'}
+                    </div>
+                  </div>
+                  <Switch
+                    checked={openAllDuplicateCodes}
+                    onCheckedChange={setOpenAllDuplicateCodes}
+                    aria-label="Open all selected rows with duplicate video codes"
+                  />
+                </div>
+                <DropdownMenuSeparator />
                 <div className="flex gap-1 px-1 pb-1">
                   <Button
                     type="button"
@@ -651,6 +671,19 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
 
 function pageRowId(item: BookmarkVideoCheckItem) {
   return `${item.videoCode}\u0000${item.url}`
+}
+
+function selectPreferredItemsByVideoCode(items: BookmarkVideoCheckItem[]) {
+  const preferredItems = new Map<string, BookmarkVideoCheckItem>()
+
+  items.forEach((item) => {
+    const existing = preferredItems.get(item.videoCode)
+    if (!existing || (getVideoContentKind(existing.title) !== 'uncensored' && getVideoContentKind(item.title) === 'uncensored')) {
+      preferredItems.set(item.videoCode, item)
+    }
+  })
+
+  return Array.from(preferredItems.values())
 }
 
 function getVideoContentKind(title: string): VideoContentKind {

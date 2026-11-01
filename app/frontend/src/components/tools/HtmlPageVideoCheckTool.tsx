@@ -51,7 +51,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
   const [selectedRowIds, setSelectedRowIds] = useState<Set<string>>(() => new Set())
   const [selectedExternalTargetKeys, setSelectedExternalTargetKeys] = useState<Set<string>>(() => new Set())
   const [includeOriginalUrl, setIncludeOriginalUrl] = useState(false)
-  const [openedVideoCodes, setOpenedVideoCodes] = useState<Set<string>>(() => new Set())
+  const [openedRowIds, setOpenedRowIds] = useState<Set<string>>(() => new Set())
 
   useEffect(() => {
     void fileApi.getDirectories().then(setDiskDirectories).catch(() => toast.error('Failed to load disk directories'))
@@ -80,8 +80,8 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
   }
   const visibleRowIds = useMemo(() => filteredItems.map(pageRowId), [filteredItems])
   const visibleUnopenedRowIds = useMemo(
-    () => filteredItems.filter((item) => !openedVideoCodes.has(item.videoCode)).map(pageRowId),
-    [filteredItems, openedVideoCodes]
+    () => filteredItems.map(pageRowId).filter((rowId) => !openedRowIds.has(rowId)),
+    [filteredItems, openedRowIds]
   )
   const selectedItems = useMemo(() => items.filter((item) => selectedRowIds.has(pageRowId(item))), [items, selectedRowIds])
   const visibleSelectedCount = visibleRowIds.filter((rowId) => selectedRowIds.has(rowId)).length
@@ -96,10 +96,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
     () => externalVideoTargets.filter((target) => selectedExternalTargetKeys.has(target.label + target.url_template)),
     [externalVideoTargets, selectedExternalTargetKeys]
   )
-  const selectedVideoCodes = useMemo(
-    () => Array.from(new Set(selectedItems.map((item) => item.videoCode))),
-    [selectedItems]
-  )
+  const selectedItemRowIds = useMemo(() => selectedItems.map(pageRowId), [selectedItems])
 
   useEffect(() => {
     const availableRowIds = new Set(items.map(pageRowId))
@@ -119,7 +116,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
     })
     setItems(parsedItems)
     setSelectedRowIds(new Set())
-    setOpenedVideoCodes(new Set())
+    setOpenedRowIds(new Set())
     setHasChecked(false)
     setStatus('all')
     setSourceLabel(nextSourceLabel)
@@ -179,32 +176,29 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
     }
   }
 
-  const markVideoCodeOpened = (videoCode: string) => {
-    setOpenedVideoCodes((previous) => {
-      if (previous.has(videoCode)) return previous
+  const markRowOpened = (rowId: string) => {
+    setOpenedRowIds((previous) => {
+      if (previous.has(rowId)) return previous
       const next = new Set(previous)
-      next.add(videoCode)
+      next.add(rowId)
       return next
     })
   }
 
-  const unselectVideoCodes = (videoCodes: Iterable<string>) => {
-    const codesToUnselect = new Set(videoCodes)
+  const unselectRows = (rowIds: Iterable<string>) => {
+    const rowIdsToUnselect = new Set(rowIds)
     setSelectedRowIds((previous) => {
       const next = new Set(previous)
-      items.forEach((item) => {
-        if (codesToUnselect.has(item.videoCode)) {
-          next.delete(pageRowId(item))
-        }
-      })
+      rowIdsToUnselect.forEach((rowId) => next.delete(rowId))
       return next.size === previous.size ? previous : next
     })
   }
 
   const openPageLink = (item: BookmarkVideoCheckItem) => {
     window.open(item.url, '_blank', 'noopener,noreferrer')
-    markVideoCodeOpened(item.videoCode)
-    unselectVideoCodes([item.videoCode])
+    const rowId = pageRowId(item)
+    markRowOpened(rowId)
+    unselectRows([rowId])
   }
 
   const toggleRowSelection = (item: BookmarkVideoCheckItem, checked: boolean) => {
@@ -268,8 +262,8 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
       const startIndex = selectedVisibleIndexes.length > 0 ? Math.max(...selectedVisibleIndexes) + 1 : 0
       const rowIdsToSelect = filteredItems
         .slice(startIndex)
-        .filter((item) => !openedVideoCodes.has(item.videoCode))
         .map(pageRowId)
+        .filter((rowId) => !openedRowIds.has(rowId))
         .filter((rowId) => !previous.has(rowId))
         .slice(0, count)
 
@@ -282,7 +276,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
   }
 
   const openSelectedExternalTargets = async () => {
-    if (selectedVideoCodes.length === 0 || (selectedExternalTargets.length === 0 && !includeOriginalUrl)) {
+    if (selectedItems.length === 0 || (selectedExternalTargets.length === 0 && !includeOriginalUrl)) {
       return
     }
 
@@ -322,8 +316,8 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
         }
       }
     }
-    setOpenedVideoCodes((previous) => new Set([...previous, ...selectedVideoCodes]))
-    unselectVideoCodes(selectedVideoCodes)
+    setOpenedRowIds((previous) => new Set([...previous, ...selectedItemRowIds]))
+    unselectRows(selectedItemRowIds)
     const openedCount = openedTabs.filter((tab) => tab !== null).length
     if (openedCount < links.length) {
       toast.error(`Opened ${openedCount} of ${links.length} selected site link${links.length === 1 ? '' : 's'}`)
@@ -558,7 +552,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
                     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                       <div className="font-mono text-sm font-semibold">{item.videoCode}</div>
                       <VideoContentKindBadge kind={getVideoContentKind(item.title)} />
-                      <OpenedVideoCodeBadge opened={openedVideoCodes.has(item.videoCode)} />
+                      <OpenedVideoCodeBadge opened={openedRowIds.has(pageRowId(item))} />
                     </div>
                     <h3 className="mt-1 truncate text-sm font-medium" title={item.title}>{item.title}</h3>
                   </div>
@@ -630,7 +624,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
                 </td>
                 <td className="px-3 py-2 align-middle">{hasChecked ? <BookmarkStatusBadge exists={item.fileExists} /> : <span className="text-xs text-muted-foreground">Not checked</span>}</td>
                 <td className="px-3 py-2 align-middle">
-                  <OpenedVideoCodeBadge opened={openedVideoCodes.has(item.videoCode)} />
+                  <OpenedVideoCodeBadge opened={openedRowIds.has(pageRowId(item))} />
                 </td>
                 <td className="px-3 py-2 text-right align-middle">
                   <Button type="button" size="icon" variant="ghost" onClick={(event) => {

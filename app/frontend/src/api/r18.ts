@@ -27,6 +27,24 @@ function parseActressDownloadMonitor(data: ActressDownloadMonitor): ActressDownl
 }
 
 export const r18Api = {
+  async getActressAliases(): Promise<Record<number, string>> {
+    const res = await fetch(`${API_BASE}/r18/actress-aliases`)
+    if (!res.ok) throw new Error('Failed to fetch actress aliases')
+    const data = await res.json() as Record<string, string>
+    return Object.fromEntries(Object.entries(data).map(([id, name]) => [Number(id), name]))
+  },
+
+  async setActressAlias(id: number, name: string): Promise<string> {
+    const res = await fetch(`${API_BASE}/r18/actresses/${id}/alias`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    })
+    if (!res.ok) throw new Error('Failed to save actress name')
+    const data = await res.json() as { name: string }
+    return data.name
+  },
+
   async getStatus(): Promise<R18Status> {
     const res = await fetch(`${API_BASE}/r18/status`)
     if (!res.ok) throw new Error('Failed to fetch R18 status')

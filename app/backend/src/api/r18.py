@@ -37,6 +37,7 @@ from ..models.models import ActressDetail, ActressesResponse, ActressSummary, Ac
 from ..schemas import db_helper as _dbh
 from ..schemas.db_helper import db_session
 from ..schemas.actress_work_file_state import ActressWorkFileStateRecord
+from ..schemas.actress_alias import ActressAliasRecord
 from ..schemas.download_queue import DownloadQueueRecord
 from ..schemas.file import FileRecord
 from ..schemas.r18_db import R18_DB_PATH, ensure_r18_indexes, get_import_status, r18_db_ready, read_metadata, save_uploaded_gz, schedule_import_from_url, schedule_import_r18_sql_gz
@@ -120,6 +121,35 @@ class WorkOpenedRequest(BaseModel):
 class WorksOpenedRequest(BaseModel):
     content_ids: list[str]
     sites: list[str] = []
+
+
+class ActressAliasRequest(BaseModel):
+    name: str = Field(default="", max_length=200)
+
+
+@router.get("/actress-aliases")
+async def get_actress_aliases():
+    rows = await _run_with_db_session(lambda db: db.query(ActressAliasRecord).all())
+    return {str(row.actress_id): row.name for row in rows}
+
+
+@router.put("/actresses/{actress_id}/alias")
+async def set_actress_alias(actress_id: int, body: ActressAliasRequest):
+    name = body.name.strip()
+
+    def save(db):
+        row = db.get(ActressAliasRecord, actress_id)
+        if not name:
+            if row:
+                db.delete(row)
+        elif row:
+            row.name = name
+        else:
+            db.add(ActressAliasRecord(actress_id=actress_id, name=name))
+        db.commit()
+        return name
+
+    return {"actress_id": actress_id, "name": await _run_with_db_session(save)}
 
 
 def _build_qbit_labels(

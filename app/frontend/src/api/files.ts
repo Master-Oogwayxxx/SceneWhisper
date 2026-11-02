@@ -36,6 +36,8 @@ export const fileApi = {
         resolution: params.resolution || undefined,
         file_size_operator: params.fileSizeOperator || undefined,
         file_size_bytes: params.fileSizeBytes ?? undefined,
+        duration_min_seconds: params.durationMinSeconds ?? undefined,
+        duration_max_seconds: params.durationMaxSeconds ?? undefined,
       },
     })
 
@@ -75,6 +77,8 @@ export const fileApi = {
         resolution: params.resolution || undefined,
         file_size_operator: params.fileSizeOperator || undefined,
         file_size_bytes: params.fileSizeBytes ?? undefined,
+        duration_min_seconds: params.durationMinSeconds ?? undefined,
+        duration_max_seconds: params.durationMaxSeconds ?? undefined,
       },
     })
     return res.data

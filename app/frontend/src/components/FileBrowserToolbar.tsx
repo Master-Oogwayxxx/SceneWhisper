@@ -184,6 +184,10 @@ export function FileBrowserToolbar({
                                 setFileSizeOperator={(v) => setDraftFilters((prev) => ({ ...prev, fileSizeOperator: v }))}
                                 fileSizeValue={draftFilters.fileSizeValue}
                                 setFileSizeValue={(v) => setDraftFilters((prev) => ({ ...prev, fileSizeValue: v }))}
+                                durationMinSeconds={draftFilters.durationMinSeconds}
+                                setDurationMinSeconds={(v) => setDraftFilters((prev) => ({ ...prev, durationMinSeconds: v }))}
+                                durationMaxSeconds={draftFilters.durationMaxSeconds}
+                                setDurationMaxSeconds={(v) => setDraftFilters((prev) => ({ ...prev, durationMaxSeconds: v }))}
                                 onOpen={onOpenFilters}
                                 onLoadPreset={handleLoadPreset}
                                 onSetDefaultPreset={handleSetDefaultPreset}

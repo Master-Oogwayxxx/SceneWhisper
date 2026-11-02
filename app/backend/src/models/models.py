@@ -81,6 +81,8 @@ class FileQueryParams(BaseModel):
     resolution: Optional[str] = None
     file_size_operator: Optional[str] = None
     file_size_bytes: Optional[int] = None
+    duration_min_seconds: Optional[float] = None
+    duration_max_seconds: Optional[float] = None
 
 
 class Directory(BaseModel):

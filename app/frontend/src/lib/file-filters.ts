@@ -30,6 +30,8 @@ export interface FileFilterState {
   resolutionFilter: FileResolution[]
   fileSizeOperator: FileSizeOperator
   fileSizeValue: number | null
+  durationMinSeconds: number | null
+  durationMaxSeconds: number | null
   selectedDirectoryIds: string[]
   directoryExclude: boolean
   /** Legacy saved presets used a single directory id. */
@@ -68,6 +70,8 @@ export const EMPTY_FILE_FILTER_STATE: FileFilterState = {
   resolutionFilter: [],
   fileSizeOperator: 'gte',
   fileSizeValue: null,
+  durationMinSeconds: null,
+  durationMaxSeconds: null,
   selectedDirectoryIds: [],
   directoryExclude: false,
   isGroupedView: false,
@@ -100,6 +104,8 @@ export function isFileFilterActive(filters: FileFilterState): boolean {
     filters.contentTag !== null ||
     filters.resolutionFilter.length > 0 ||
     filters.fileSizeValue !== null ||
+    filters.durationMinSeconds !== null ||
+    filters.durationMaxSeconds !== null ||
     filters.selectedDirectoryIds.length > 0
   )
 }

@@ -6,4 +6,5 @@ from .file import FileRecord
 from .scene import SceneRecord
 from .task import TaskRecord
 
-__all__ = ["ActressWorkFileStateRecord", "DeletedFileRecord", "DirectoryMonitorRecord", "DirectoryRecord", "FileRecord", "SceneRecord", "TaskRecord"]
+__all__ = ["ActressAliasRecord", "ActressWorkFileStateRecord", "DeletedFileRecord", "DirectoryMonitorRecord", "DirectoryRecord", "FileRecord", "SceneRecord", "TaskRecord"]
+from .actress_alias import ActressAliasRecord

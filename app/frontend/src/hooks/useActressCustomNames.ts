@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { r18Api } from '@/api/r18'
 import { ActressSummary } from '@/types/types'
 
 const STORAGE_KEY = 'scenewhisper.actressCustomNames'
@@ -39,16 +41,29 @@ function writeCustomNames(customNames: ActressCustomNames) {
       .filter(([, value]) => value.trim())
       .map(([id, value]) => [id, value.trim()]),
   )
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned))
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned))
+  } catch {
+    // The UI alias should still be usable when storage is unavailable or full.
+  }
 }
 
 export function useActressCustomNames() {
-  const [customNames, setCustomNamesState] = useState<ActressCustomNames>(() => readCustomNames())
+  const queryClient = useQueryClient()
+  const [localNames, setLocalNames] = useState<ActressCustomNames>(() => readCustomNames())
+  const aliasesQuery = useQuery({ queryKey: ['r18', 'actress-aliases'], queryFn: r18Api.getActressAliases })
+  // Keep pre-existing browser aliases visible while the server-backed store is
+  // being populated or when an older installation has no aliases yet.
+  const customNames = { ...localNames, ...(aliasesQuery.data ?? {}) }
+
+  useEffect(() => {
+    writeCustomNames(customNames)
+  }, [customNames])
 
   useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key === STORAGE_KEY) {
-        setCustomNamesState(readCustomNames())
+        setLocalNames(readCustomNames())
       }
     }
 
@@ -57,18 +72,18 @@ export function useActressCustomNames() {
   }, [])
 
   const setCustomName = useCallback((actressId: number, name: string) => {
-    setCustomNamesState((prev) => {
-      const next = { ...prev }
+    const next = { ...customNames }
       const trimmed = name.trim()
       if (trimmed) {
         next[actressId] = trimmed
       } else {
         delete next[actressId]
       }
-      writeCustomNames(next)
-      return next
+    setLocalNames(next)
+    void r18Api.setActressAlias(actressId, trimmed).then(() => {
+      void queryClient.invalidateQueries({ queryKey: ['r18', 'actress-aliases'] })
     })
-  }, [])
+  }, [customNames, queryClient])
 
   return { customNames, setCustomName }
 }

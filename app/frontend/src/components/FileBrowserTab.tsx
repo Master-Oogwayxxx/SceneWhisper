@@ -150,6 +150,8 @@ const getInitialFileFilters = (): FileFilterState => {
         resolutionFilter: getQueryList('resolution').filter((value): value is FileResolution => FILE_RESOLUTIONS.includes(value as FileResolution)),
         fileSizeOperator: FILE_SIZE_OPERATORS.includes(sizeOperator as FileSizeOperator) ? sizeOperator as FileSizeOperator : 'gte',
         fileSizeValue: getQueryFileSizeValue(),
+            durationMinSeconds: null,
+            durationMaxSeconds: null,
         selectedDirectoryIds: getQueryList('dirs'),
         directoryExclude: getQueryBoolean('dirExclude'),
         isGroupedView: getQueryBoolean('grouped'),
@@ -567,6 +569,8 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
                 resolution: appliedFilters.resolutionFilter.length ? appliedFilters.resolutionFilter.join(',') : null,
                 fileSizeOperator: appliedFilters.fileSizeOperator,
                 fileSizeBytes: fileSizeMbToBytes(appliedFilters.fileSizeValue),
+                durationMinSeconds: appliedFilters.durationMinSeconds,
+                durationMaxSeconds: appliedFilters.durationMaxSeconds,
             }, signal);
         },
         enabled: layoutMode !== 'tree' && !isGroupedView,
@@ -642,6 +646,8 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
             resolution: appliedFilters.resolutionFilter.length ? appliedFilters.resolutionFilter.join(',') : null,
             fileSizeOperator: appliedFilters.fileSizeOperator,
             fileSizeBytes: fileSizeMbToBytes(appliedFilters.fileSizeValue),
+            durationMinSeconds: appliedFilters.durationMinSeconds,
+            durationMaxSeconds: appliedFilters.durationMaxSeconds,
         }, signal),
         enabled: layoutMode !== 'tree' && isGroupedView,
         staleTime: FILE_BROWSER_QUERY_STALE_TIME_MS,
@@ -725,6 +731,8 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
                 resolution: appliedFilters.resolutionFilter.length ? appliedFilters.resolutionFilter.join(',') : null,
                 fileSizeOperator: appliedFilters.fileSizeOperator,
                 fileSizeBytes: fileSizeMbToBytes(appliedFilters.fileSizeValue),
+                durationMinSeconds: appliedFilters.durationMinSeconds,
+                durationMaxSeconds: appliedFilters.durationMaxSeconds,
             } as const;
 
             return isGroupedView
@@ -921,6 +929,8 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
                 resolution: appliedFilters.resolutionFilter.length ? appliedFilters.resolutionFilter.join(',') : null,
                 fileSizeOperator: appliedFilters.fileSizeOperator,
                 fileSizeBytes: fileSizeMbToBytes(appliedFilters.fileSizeValue),
+                durationMinSeconds: appliedFilters.durationMinSeconds,
+                durationMaxSeconds: appliedFilters.durationMaxSeconds,
             });
 
             const firstMatch = result.files[0];
@@ -1462,6 +1472,8 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
             contentTag: filters.contentTag ?? null,
             fileSizeOperator: filters.fileSizeOperator ?? 'gte',
             fileSizeValue: filters.fileSizeValue ?? null,
+            durationMinSeconds: filters.durationMinSeconds ?? null,
+            durationMaxSeconds: filters.durationMaxSeconds ?? null,
             selectedDirectoryIds: selectedIds,
             directoryExclude: selectedIds.length > 0 ? (filters.directoryExclude ?? false) : false,
             isGroupedView: grouped,
@@ -1494,6 +1506,8 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
             contentTag: defaultPreset.filters.contentTag ?? null,
             fileSizeOperator: defaultPreset.filters.fileSizeOperator ?? 'gte',
             fileSizeValue: defaultPreset.filters.fileSizeValue ?? null,
+            durationMinSeconds: defaultPreset.filters.durationMinSeconds ?? null,
+            durationMaxSeconds: defaultPreset.filters.durationMaxSeconds ?? null,
             selectedDirectoryIds: defaultSelectedIds,
             directoryExclude: defaultSelectedIds.length > 0 ? (defaultPreset.filters.directoryExclude ?? false) : false,
             isGroupedView: defaultPreset.filters.isGroupedView,
@@ -1553,6 +1567,8 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
             contentTag: filters.contentTag ?? null,
             fileSizeOperator: filters.fileSizeOperator ?? 'gte',
             fileSizeValue: filters.fileSizeValue ?? null,
+            durationMinSeconds: filters.durationMinSeconds ?? null,
+            durationMaxSeconds: filters.durationMaxSeconds ?? null,
             selectedDirectoryIds: selectedIds,
             directoryExclude: selectedIds.length > 0 ? (filters.directoryExclude ?? false) : false,
         });

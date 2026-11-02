@@ -80,6 +80,10 @@ interface FilterDialogProps {
     setFileSizeOperator: (v: FileSizeOperator) => void
     fileSizeValue: number | null
     setFileSizeValue: (v: number | null) => void
+    durationMinSeconds: number | null
+    setDurationMinSeconds: (v: number | null) => void
+    durationMaxSeconds: number | null
+    setDurationMaxSeconds: (v: number | null) => void
     onLoadPreset: (filters: FileFilterState) => void
     onSetDefaultPreset: (presetId: string | null) => Promise<void>
 }
@@ -241,6 +245,10 @@ const FileFilterDialog: React.FC<FilterDialogProps> = ({
     setFileSizeOperator,
     fileSizeValue,
     setFileSizeValue,
+    durationMinSeconds,
+    setDurationMinSeconds,
+    durationMaxSeconds,
+    setDurationMaxSeconds,
     onLoadPreset,
     onSetDefaultPreset,
 }) => {
@@ -269,6 +277,8 @@ const FileFilterDialog: React.FC<FilterDialogProps> = ({
         resolutionFilter,
         fileSizeOperator,
         fileSizeValue,
+        durationMinSeconds,
+        durationMaxSeconds,
         selectedDirectoryIds,
         directoryExclude,
         isGroupedView,
@@ -489,6 +499,13 @@ const FileFilterDialog: React.FC<FilterDialogProps> = ({
                                     )}
                                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">MB</span>
                                 </div>
+                            </div>
+                        </div>
+                        <div className="col-span-2 flex flex-col gap-2">
+                            <Label className="text-sm font-medium flex items-center gap-2"><Activity className="w-3.5 h-3.5" />Video duration</Label>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Input type="number" min={0} step="1" value={durationMinSeconds ?? ''} onChange={(e) => setDurationMinSeconds(e.target.value === '' ? null : Math.max(0, Number(e.target.value)))} placeholder="Greater than or equal (seconds)" className="h-9 text-sm" />
+                                <Input type="number" min={0} step="1" value={durationMaxSeconds ?? ''} onChange={(e) => setDurationMaxSeconds(e.target.value === '' ? null : Math.max(0, Number(e.target.value)))} placeholder="Less than or equal (seconds)" className="h-9 text-sm" />
                             </div>
                         </div>
                         <div className="col-span-2 flex flex-col gap-3 pt-4 border-t">

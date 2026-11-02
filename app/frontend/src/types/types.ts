@@ -435,6 +435,8 @@ export type FileQueryParams = {
   resolution?: string | null
   fileSizeOperator?: string | null
   fileSizeBytes?: number | null
+  durationMinSeconds?: number | null
+  durationMaxSeconds?: number | null
 }
 
 export interface DirectoryRecord {

@@ -163,6 +163,27 @@ def _apply_file_size_filter(query, operator: str | None, size_bytes: int | None)
     return query.filter(FileRecord.size >= size_bytes)
 
 
+def _duration_seconds_expression():
+    """Convert stored numeric or HH:MM:SS durations to seconds in SQLite."""
+    duration = FileRecord.duration
+    return case(
+        (duration.like("%:%"),
+         func.substr(duration, 1, func.instr(duration, ":") - 1) * 3600
+         + func.substr(duration, func.instr(duration, ":") + 1, 2) * 60
+         + func.substr(duration, -2)),
+        else_=func.cast(duration, float),
+    )
+
+
+def _apply_duration_filter(query, minimum: float | None, maximum: float | None):
+    expression = _duration_seconds_expression()
+    if minimum is not None:
+        query = query.filter(expression >= minimum)
+    if maximum is not None:
+        query = query.filter(expression <= maximum)
+    return query
+
+
 def _new_video_condition(record):
     stem = func.substr(
         record.name,
@@ -514,6 +535,7 @@ def get_files(
             query = query.filter(or_(*conditions))
 
     query = _apply_file_size_filter(query, params.file_size_operator, params.file_size_bytes)
+    query = _apply_duration_filter(query, params.duration_min_seconds, params.duration_max_seconds)
 
     # 🔀 Sorting (safe whitelist)
     sort_map = {
@@ -747,6 +769,7 @@ def get_grouped_files(
             query = query.filter(or_(*conditions))
 
     query = _apply_file_size_filter(query, params.file_size_operator, params.file_size_bytes)
+    query = _apply_duration_filter(query, params.duration_min_seconds, params.duration_max_seconds)
 
     # Keep this in SQL so grouped retrieval does not issue one sibling lookup per file.
     if params.has_no_subtitle:

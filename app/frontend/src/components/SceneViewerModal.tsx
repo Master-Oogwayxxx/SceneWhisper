@@ -248,6 +248,14 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
     }, 125);
   }, [videoDuration]);
 
+  const handlePlayerKeyDown = useCallback((event: React.KeyboardEvent) => {
+    if (!event.shiftKey || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    seekToSeconds(currentTime + (event.key === 'ArrowLeft' ? -1 : 1));
+  }, [currentTime, seekToSeconds]);
+
   const handleSeekToTimecode = (timecode: string) => {
     if (!isValidTimecode(timecode)) return;
     seekToSeconds(timecodeToSeconds(timecode));
@@ -890,6 +898,8 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
                   src={videoSource}
                   className="w-full h-full"
                   load="eager"
+                  muted
+                  onKeyDownCapture={handlePlayerKeyDown}
                   onProviderSetup={handleProviderSetup}
                 >
                   <MediaProvider />

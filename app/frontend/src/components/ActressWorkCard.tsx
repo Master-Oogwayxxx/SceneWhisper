@@ -541,7 +541,7 @@ export const ActressWorkCard = ({ work, actressName, defaultSavePath, showCover 
                   <TooltipContent side="right">Downloaded</TooltipContent>
                 </Tooltip>
               )}
-              {queueItem?.status === 'pending' && !downloadStatus && (
+              {queueItem?.status === 'pending' && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Badge variant="secondary" className="h-5 w-5 justify-center p-0" aria-label="Queued">
@@ -551,7 +551,7 @@ export const ActressWorkCard = ({ work, actressName, defaultSavePath, showCover 
                   <TooltipContent side="right">Queued</TooltipContent>
                 </Tooltip>
               )}
-              {queueItem?.status === 'processing' && !downloadStatus && (
+              {queueItem?.status === 'processing' && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Badge variant="secondary" className="h-5 w-5 justify-center bg-blue-500 p-0 hover:bg-blue-500" aria-label="Processing">

@@ -504,8 +504,34 @@ const FileFilterDialog: React.FC<FilterDialogProps> = ({
                         <div className="col-span-2 flex flex-col gap-2">
                             <Label className="text-sm font-medium flex items-center gap-2"><Activity className="w-3.5 h-3.5" />Video duration</Label>
                             <div className="grid grid-cols-2 gap-2">
-                                <Input type="number" min={0} step="1" value={durationMinSeconds ?? ''} onChange={(e) => setDurationMinSeconds(e.target.value === '' ? null : Math.max(0, Number(e.target.value)))} placeholder="Greater than or equal (seconds)" className="h-9 text-sm" />
-                                <Input type="number" min={0} step="1" value={durationMaxSeconds ?? ''} onChange={(e) => setDurationMaxSeconds(e.target.value === '' ? null : Math.max(0, Number(e.target.value)))} placeholder="Less than or equal (seconds)" className="h-9 text-sm" />
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    step="1"
+                                    value={durationMinSeconds ?? ''}
+                                    onChange={(e) => {
+                                        const value = e.target.value
+                                        const numericValue = Number(value)
+                                        setDurationMinSeconds(value === '' || !Number.isFinite(numericValue) ? null : Math.max(0, numericValue))
+                                    }}
+                                    placeholder="Greater than or equal (seconds)"
+                                    aria-label="Minimum video duration in seconds"
+                                    className="h-9 text-sm"
+                                />
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    step="1"
+                                    value={durationMaxSeconds ?? ''}
+                                    onChange={(e) => {
+                                        const value = e.target.value
+                                        const numericValue = Number(value)
+                                        setDurationMaxSeconds(value === '' || !Number.isFinite(numericValue) ? null : Math.max(0, numericValue))
+                                    }}
+                                    placeholder="Less than or equal (seconds)"
+                                    aria-label="Maximum video duration in seconds"
+                                    className="h-9 text-sm"
+                                />
                             </div>
                         </div>
                         <div className="col-span-2 flex flex-col gap-3 pt-4 border-t">

@@ -864,7 +864,10 @@ export const Dashboard = ({ tab, setTab, statsMinimized, highlightedTaskId, high
         selectedFiles={selectedFiles}
         tasks={tasksQuery.data?.tasks ?? []}
         onCreateTask={handleCreateTask}
-        onTaskCreated={() => queryClient.invalidateQueries({ queryKey: ['stats'] })}
+        onTaskCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ['stats'] });
+          queryClient.invalidateQueries({ queryKey: ['tasks', 'active-file-badges'] });
+        }}
         directoryTree={directoryTree}
       />
 

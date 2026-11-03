@@ -51,6 +51,7 @@ import { FileBrowserToolbar } from './FileBrowserToolbar';
 import { SelectedTreeDirectoriesBar } from './SelectedTreeDirectoriesBar';
 import { SelectedFilesActionBar } from './SelectedFilesActionBar';
 import { FileBrowserPagination } from './FileBrowserPagination';
+import { FileBrowserDialogs } from './FileBrowserDialogs';
 import { useCancelTask, useDeleteTask } from '@/hooks/useTasks';
 
 const FileRowSkeleton: React.FC = () => (
@@ -2001,6 +2002,28 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+        <FileBrowserDialogs
+            directoryRenameTargetId={directoryRenameTargetId}
+            directoryRenameValue={directoryRenameValue}
+            setDirectoryRenameTargetId={setDirectoryRenameTargetId}
+            setDirectoryRenameValue={setDirectoryRenameValue}
+            onRenameDirectory={() => void handleRenameSelectedTreeDirectory()}
+            directoryMoveTargetId={directoryMoveTargetId}
+            directoryMoveDestinationId={directoryMoveDestinationId}
+            setDirectoryMoveTargetId={setDirectoryMoveTargetId}
+            setDirectoryMoveDestinationId={setDirectoryMoveDestinationId}
+            moveTargetDirectory={moveTargetDirectory}
+            availableMoveDestinations={availableMoveDestinations}
+            onMoveDirectory={() => void handleMoveSelectedTreeDirectory()}
+            fileMoveTargetId={fileMoveTargetId}
+            fileMoveDestinationId={fileMoveDestinationId}
+            setFileMoveTargetId={setFileMoveTargetId}
+            setFileMoveDestinationId={setFileMoveDestinationId}
+            moveTargetFile={moveTargetFile}
+            availableFileMoveDestinations={availableFileMoveDestinations}
+            onMoveFile={() => void handleMoveSelectedFile()}
+        />
+        {false && <>
         <Dialog
             open={directoryRenameTargetId !== null}
             onOpenChange={(open) => {
@@ -2134,6 +2157,7 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        </>}
     </>
 }
 

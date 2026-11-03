@@ -17,21 +17,13 @@ import { TaskCard } from './TaskCard'
 import TaskSorting, { type TaskSortField } from './TaskSorting'
 import { BulkProgressDialog } from './BulkProgressDialog'
 import DashboardStats from './DashboardStats'
+import { formatEtaSeconds, taskMatchesTypeFilter } from '@/lib/task-queue-utils'
 
 const compactToolbarButtonClass = 'h-8 gap-1.5 px-2 text-xs sm:h-[40px] sm:gap-2 sm:px-3 sm:text-sm'
 const compactToolbarIconClass = 'h-3.5 w-3.5 sm:h-4 sm:w-4'
 const compactPageButtonClass = 'min-h-0 rounded-md border text-xs font-medium sm:text-sm'
 const compactPageIconClass = 'h-3.5 w-3.5 sm:h-4 sm:w-4'
 
-function formatEtaSeconds(seconds: number): string {
-  const safe = Math.max(0, Math.ceil(seconds))
-  const h = Math.floor(safe / 3600)
-  const m = Math.floor((safe % 3600) / 60)
-  const s = safe % 60
-  if (h > 0) return `~${h}h ${m}m`
-  if (m > 0) return `~${m}m ${s}s`
-  return `~${s}s`
-}
 
 interface TaskQueueProps {
   /** Tasks to display (filtered by status and optional name search inside this component). */
@@ -94,12 +86,6 @@ const filters: { value: TaskQueueFilter; label: string; icon: typeof Clock }[] =
   { value: 'cancelled', label: 'Cancelled', icon: Ban },
   { value: 'paused', label: 'Paused', icon: Pause },
 ]
-
-const taskMatchesTypeFilter = (taskType: TaskTypeFilter, selectedTypes: TaskTypeFilter[]): boolean => {
-  if (selectedTypes.length === 0) return true
-  if (selectedTypes.includes(taskType)) return true
-  return taskType === 'all' && selectedTypes.some((type) => type === 'scene' || type === 'split' || type === 'subtitle')
-}
 
 /**
  * Renders a filterable list of task cards with optional search by source video file name.

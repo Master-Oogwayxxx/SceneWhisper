@@ -29,6 +29,7 @@ import { ActressWorksFilterState, filterActressWorksByMetadataSource, filterActr
 import { buildExternalVideoTargetUrl, isValidExternalVideoTarget } from '@/lib/external-video-targets'
 import { resolveSelectedWorkLinks } from '@/lib/selected-work-links'
 import { useQueryClient } from '@tanstack/react-query'
+import { pickBestNyaaResult, sanitizeActressWorksFileName } from '@/lib/actress-works-utils'
 
 const PAGE_SIZE_OPTIONS = [10, 15, 25, 50, 100, 250, 500, 1000]
 const EXPANDED_ACTIONS_MIN_WIDTH = 1920
@@ -52,26 +53,6 @@ function WorkCardSkeleton({ showCover }: { showCover: boolean }) {
   )
 }
 
-function rankNyaaResult(result: Pick<NyaaResult, 'title' | 'seeders'>): [number, number, number] {
-  const titleLower = result.title.toLowerCase()
-  return [
-    Number(titleLower.includes('reducing mosaic')),
-    Number(titleLower.includes('uncensored')),
-    result.seeders,
-  ]
-}
-
-function pickBestNyaaResult(results: NyaaResult[]): NyaaResult | null {
-  if (results.length === 0) return null
-  return [...results].sort((a, b) => {
-    const [aReducing, aUncensored, aSeeders] = rankNyaaResult(a)
-    const [bReducing, bUncensored, bSeeders] = rankNyaaResult(b)
-    if (aReducing !== bReducing) return bReducing - aReducing
-    if (aUncensored !== bUncensored) return bUncensored - aUncensored
-    if (aSeeders !== bSeeders) return bSeeders - aSeeders
-    return 0
-  })[0]
-}
 
 function escapeXml(value: string): string {
   return value
@@ -210,14 +191,6 @@ function downloadTextFile(filename: string, value: string) {
   anchor.click()
   document.body.removeChild(anchor)
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
-}
-
-function sanitizeFileName(value: string): string {
-  return value
-    .trim()
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
-    .replace(/\s+/g, ' ')
-    .slice(0, 120)
 }
 
 export interface ActressWorksPanelProps {
@@ -512,7 +485,7 @@ export function ActressWorksPanel({
         })
       }
 
-      const actressFileName = sanitizeFileName(actressName ?? `actress-${detail.id}`)
+      const actressFileName = sanitizeActressWorksFileName(actressName ?? `actress-${detail.id}`)
       downloadExcelFile(`${actressFileName}-magnets.xlsx`, exportedRows)
       toast.success(
         missingMagnets > 0
@@ -534,7 +507,7 @@ export function ActressWorksPanel({
     setExportingAliasMagnets(true)
     try {
       const response = await r18Api.exportActressMagnets(detail.id)
-      const actressFileName = sanitizeFileName(response.actress_name || actressName || `actress-${detail.id}`)
+      const actressFileName = sanitizeActressWorksFileName(response.actress_name || actressName || `actress-${detail.id}`)
       const contents = response.magnets.length > 0 ? `${response.magnets.join('\n')}\n` : ''
       downloadTextFile(`${actressFileName}-all-magnets.txt`, contents)
       toast.success(

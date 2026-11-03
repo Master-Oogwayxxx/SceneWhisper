@@ -4,14 +4,6 @@ import { AlertTriangle, Check, ChevronFirst, ChevronLast, ChevronLeft, ChevronRi
 import { toast } from 'sonner'
 
 import { scraperApi, ScraperVideoFilters, ScraperVideoSortBy, ScraperVideoSortDir } from '@/api/scraper'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -28,8 +20,10 @@ import { ScraperBulkRunDialog } from '@/components/ScraperBulkRunDialog'
 import { ScraperRunDialog, urlsForScraperSource } from '@/components/ScraperRunDialog'
 import { ScraperAddEditDialog } from '@/components/ScraperAddEditDialog'
 import { ScraperVideosDialog, ScraperVideoPageSize } from '@/components/ScraperVideosDialog'
+import { ScraperBulkScheduleDialog } from '@/components/ScraperBulkScheduleDialog'
 import { useSettings } from '@/hooks/useSettings'
 import { ScraperSource, ScraperTemplate } from '@/types/types'
+import { formatScraperDate as formatDate, scraperValueTime as getTime, hostnameFromUrl, websiteBadgesForSource, scraperRunKey, isFailedWebsiteStat, upsertScraperSource } from '@/lib/scraper-tab-utils'
 
 type ScraperProgressEvent = {
   sourceId: string
@@ -64,65 +58,6 @@ const SOURCE_SORT_OPTIONS: { value: SourceSortField; label: string }[] = [
   { value: 'lastFound', label: 'Found' },
   { value: 'lastPagesScraped', label: 'Pages' },
 ]
-
-function formatDate(value?: Date | null): string {
-  return value ? value.toLocaleString() : 'Never'
-}
-
-function getTime(value?: Date | string | null): number {
-  return value ? new Date(value).getTime() : 0
-}
-
-function hostnameFromUrl(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '')
-  } catch {
-    return url
-  }
-}
-
-function websiteBadgesForSource(source: ScraperSource, templates: ScraperTemplate[]): string[] {
-  return urlsForScraperSource(source).map((url) => {
-    const matchingTemplate = templates.find((template) => {
-      const [prefix, suffix = ''] = template.url_template.split('{actress_name}')
-      return url.startsWith(prefix) && (!suffix || url.endsWith(suffix))
-    })
-    try {
-      return matchingTemplate?.label.trim() || new URL(url).hostname.replace(/^www\./, '')
-    } catch {
-      return matchingTemplate?.label.trim() || url
-    }
-  }).filter((label): label is string => Boolean(label))
-}
-
-function scraperRunKey(sourceId: string, urls?: string[]): string {
-  const normalizedUrls = urls
-    ?.map((url) => normalizeScraperUrl(url))
-    .filter(Boolean)
-  return `${sourceId}:${normalizedUrls?.length ? normalizedUrls.join('|') : '*'}`
-}
-
-function isFailedWebsiteStat(source: ScraperSource, stat: NonNullable<ScraperSource['lastWebsiteStats']>[number]): boolean {
-  if (stat.blocked) {
-    return true
-  }
-  return Boolean(
-    source.lastError
-    && stat.pagesScraped === 0
-    && stat.found === 0
-    && stat.created === 0
-    && stat.updated === 0
-  )
-}
-
-function upsertScraperSource(sources: ScraperSource[] | undefined, updatedSource: ScraperSource): ScraperSource[] {
-  const currentSources = sources ?? []
-  const existingIndex = currentSources.findIndex((source) => source.id === updatedSource.id)
-  if (existingIndex === -1) {
-    return [...currentSources, updatedSource]
-  }
-  return currentSources.map((source, index) => (index === existingIndex ? updatedSource : source))
-}
 
 function ScraperCardSkeleton() {
   return (
@@ -1100,77 +1035,19 @@ export function ScraperTab({
         <div />
       </div>
 
-      <Dialog open={isBulkScheduleOpen} onOpenChange={setIsBulkScheduleOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit {selectedSourceCount} Scraper{selectedSourceCount === 1 ? '' : 's'}</DialogTitle>
-            <DialogDescription>
-              Apply one schedule to all selected scraper sources.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Interval</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['hourly', 'daily', 'weekly'] as const).map((interval) => (
-                  <Button
-                    key={interval}
-                    type="button"
-                    variant={bulkScheduleInterval === interval ? 'default' : 'outline'}
-                    onClick={() => setBulkScheduleInterval(interval)}
-                    className="capitalize"
-                  >
-                    {interval}
-                  </Button>
-                ))}
-              </div>
-            </div>
-            {bulkScheduleInterval !== 'hourly' && (
-              <div className={bulkScheduleInterval === 'weekly' ? 'grid grid-cols-1 gap-4 sm:grid-cols-2' : 'space-y-2'}>
-                <div className="space-y-2">
-                  <Label htmlFor="bulk-scraper-schedule-time">Time (Local)</Label>
-                  <Input
-                    id="bulk-scraper-schedule-time"
-                    type="time"
-                    value={bulkScheduleTime}
-                    onChange={(event) => setBulkScheduleTime(event.target.value)}
-                  />
-                </div>
-                {bulkScheduleInterval === 'weekly' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="bulk-scraper-schedule-day">Day of Week</Label>
-                    <Select
-                      value={String(bulkScheduleDayOfWeek)}
-                      onValueChange={(value) => setBulkScheduleDayOfWeek(Number(value))}
-                    >
-                      <SelectTrigger id="bulk-scraper-schedule-day">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0">Sunday</SelectItem>
-                        <SelectItem value="1">Monday</SelectItem>
-                        <SelectItem value="2">Tuesday</SelectItem>
-                        <SelectItem value="3">Wednesday</SelectItem>
-                        <SelectItem value="4">Thursday</SelectItem>
-                        <SelectItem value="5">Friday</SelectItem>
-                        <SelectItem value="6">Saturday</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsBulkScheduleOpen(false)} disabled={bulkScheduleMutation.isPending}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={() => bulkScheduleMutation.mutate()} disabled={bulkScheduleMutation.isPending}>
-              {bulkScheduleMutation.isPending ? 'Saving...' : 'Apply Schedule'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ScraperBulkScheduleDialog
+        open={isBulkScheduleOpen}
+        selectedCount={selectedSourceCount}
+        interval={bulkScheduleInterval}
+        time={bulkScheduleTime}
+        dayOfWeek={bulkScheduleDayOfWeek}
+        saving={bulkScheduleMutation.isPending}
+        onOpenChange={setIsBulkScheduleOpen}
+        onIntervalChange={setBulkScheduleInterval}
+        onTimeChange={setBulkScheduleTime}
+        onDayOfWeekChange={setBulkScheduleDayOfWeek}
+        onSubmit={() => bulkScheduleMutation.mutate()}
+      />
 
       <ScraperAddEditDialog
         open={isAddOpen}

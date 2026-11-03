@@ -17,7 +17,6 @@ import { Button } from './ui/button'
 import { Input } from './ui/input'
 import { Skeleton } from './ui/skeleton'
 import { Progress } from './ui/progress'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog'
 import { Label } from './ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Switch } from './ui/switch'
@@ -25,6 +24,9 @@ import { cn, localTimeToUtc, utcTimeToLocal } from '@/lib/utils'
 import { ActressWorksPanel } from './ActressWorksPanel'
 import { ActressWorkQueueDialog } from './ActressWorkQueueDialog'
 import { ActressSchedulesDialog } from './ActressSchedulesDialog'
+import { ActressScheduleEditor } from './ActressScheduleEditor'
+import { ActressImportDialog } from './ActressImportDialog'
+import { ActressQueueAllDialog } from './ActressQueueAllDialog'
 import { ActressWorksFilterState, EMPTY_ACTRESS_WORKS_FILTER_STATE, filterActressWorksByOpenedState } from '@/lib/actress-works-filters'
 import { mergeSelectedWorks, toggleActressWorkSelection } from '@/lib/selected-works'
 import { useDownloads } from '@/hooks/useDownloads'
@@ -232,126 +234,6 @@ export function R18AutoRefreshSection({ settings, onPatch }: R18AutoRefreshSecti
         <p className="text-sm text-destructive">{settings.r18_auto_refresh_last_error}</p>
       )}
     </div>
-  )
-}
-
-interface ActressScheduleDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  monitor?: ActressDownloadMonitor | null
-  actressName?: string
-  onSave: (patch: {
-    interval: 'hourly' | 'daily' | 'weekly'
-    time?: string
-    dayOfWeek?: number
-    maxItemsPerRun: number
-    savePath?: string
-    isActive: boolean
-  }) => void
-}
-
-function ActressScheduleDialog({ open, onOpenChange, monitor, actressName, onSave }: ActressScheduleDialogProps) {
-  const [interval, setInterval] = useState<'hourly' | 'daily' | 'weekly'>('daily')
-  const [time, setTime] = useState('09:00')
-  const [dayOfWeek, setDayOfWeek] = useState(1)
-  const [maxItemsPerRun, setMaxItemsPerRun] = useState(25)
-  const [savePath, setSavePath] = useState('')
-  const [isActive, setIsActive] = useState(true)
-
-  useEffect(() => {
-    if (!open) return
-    setInterval(monitor?.schedule.interval ?? 'daily')
-    setTime(utcTimeToLocal(monitor?.schedule.time ?? '09:00'))
-    setDayOfWeek(monitor?.schedule.dayOfWeek ?? 1)
-    setMaxItemsPerRun(monitor?.maxItemsPerRun ?? 25)
-    setSavePath(monitor?.savePath ?? '')
-    setIsActive(monitor?.isActive ?? true)
-  }, [monitor, open])
-
-  const handleSave = () => {
-    onSave({
-      interval,
-      time: interval !== 'hourly' ? localTimeToUtc(time) : undefined,
-      dayOfWeek: interval === 'weekly' ? dayOfWeek : undefined,
-      maxItemsPerRun: Math.max(1, maxItemsPerRun || 25),
-      savePath: savePath.trim() || undefined,
-      isActive,
-    })
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{monitor ? 'Edit actress schedule' : 'Schedule actress downloads'}</DialogTitle>
-          <DialogDescription>
-            {actressName ? `Automatically queue matching works for ${actressName}.` : 'Automatically queue matching actress works.'}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Check interval</Label>
-            <Select value={interval} onValueChange={(value) => setInterval(value as 'hourly' | 'daily' | 'weekly')}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="hourly">Hourly</SelectItem>
-                <SelectItem value="daily">Daily</SelectItem>
-                <SelectItem value="weekly">Weekly</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {interval !== 'hourly' && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="actress-schedule-time">Time</Label>
-                <Input id="actress-schedule-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-              </div>
-              {interval === 'weekly' && (
-                <div className="space-y-2">
-                  <Label>Day</Label>
-                  <Select value={String(dayOfWeek)} onValueChange={(value) => setDayOfWeek(Number(value))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {DAYS_OF_WEEK.map((day) => (
-                        <SelectItem key={day.value} value={String(day.value)}>{day.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="actress-max-items">Max works per run</Label>
-            <Input
-              id="actress-max-items"
-              type="number"
-              min={1}
-              max={500}
-              value={maxItemsPerRun}
-              onChange={(e) => setMaxItemsPerRun(Number(e.target.value))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="actress-save-path">Default save path</Label>
-            <Input
-              id="actress-save-path"
-              value={savePath}
-              onChange={(e) => setSavePath(e.target.value)}
-              placeholder="Use qBittorrent default"
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
-            Enable this schedule
-          </label>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="button" onClick={handleSave}>{monitor ? 'Update schedule' : 'Create schedule'}</Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   )
 }
 
@@ -1502,7 +1384,7 @@ export const ActressTab = () => {
         onToggle={(monitor) => void handleToggleSchedule(monitor)}
         onDelete={(monitor) => void handleDeleteSchedule(monitor)}
       />
-      <ActressScheduleDialog
+      <ActressScheduleEditor
         open={scheduleEditorOpen}
         onOpenChange={(open) => {
           setScheduleEditorOpen(open)
@@ -1515,96 +1397,27 @@ export const ActressTab = () => {
         actressName={editingSchedule?.actressName ?? (scheduleTarget ? formatActressName(scheduleTarget, actressCustomNames) : undefined)}
         onSave={(patch) => void handleSaveSchedule(patch)}
       />
-      <Dialog
+      <ActressQueueAllDialog
         open={queueAllDialogOpen}
         onOpenChange={(open) => {
           setQueueAllDialogOpen(open)
-          if (!open && !queueAllLoading) {
-            setQueueAllSavePath(selectedActressMonitor?.savePath ?? '')
-          }
+          if (!open && !queueAllLoading) setQueueAllSavePath(selectedActressMonitor?.savePath ?? '')
         }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Queue all works</DialogTitle>
-            <DialogDescription>
-              Enter the qBittorrent save path to use for every work in the current actress search and filter context.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2 py-2">
-            <Label htmlFor="queue-all-save-path">Save path</Label>
-            <Input
-              id="queue-all-save-path"
-              value={queueAllSavePath}
-              onChange={(e) => setQueueAllSavePath(e.target.value)}
-              placeholder="D:/Media/Downloads/Actress Name"
-              disabled={queueAllLoading}
-            />
-          </div>
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setQueueAllDialogOpen(false)}
-              disabled={queueAllLoading}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleQueueAll()}
-              disabled={queueAllLoading || !queueAllSavePath.trim()}
-            >
-              {queueAllLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Queue All
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Load r18.dev dump</DialogTitle>
-            <DialogDescription>
-              Choose whether to import a local dump file or download the latest dump from r18.dev.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 pt-2 sm:grid-cols-2">
-            <button
-              type="button"
-              className="group flex min-w-0 flex-col items-start gap-2 rounded-md border border-input bg-background px-4 py-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
-              disabled={importing}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <span className="flex min-w-0 items-center gap-2 font-medium">
-                <Database className="h-4 w-4" />
-                Import local dump
-              </span>
-              <span className="min-w-0 whitespace-normal break-words text-sm font-normal text-muted-foreground group-hover:text-accent-foreground">
-                Pick a `.sql.gz` dump file from disk and import it into SceneWhisper.
-              </span>
-            </button>
-            <button
-              type="button"
-              className="group flex min-w-0 flex-col items-start gap-2 rounded-md border border-input bg-background px-4 py-4 text-left transition-colors hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50"
-              disabled={importing}
-              onClick={() => void handleImportLatest()}
-            >
-              <span className="flex min-w-0 items-center gap-2 font-medium">
-                <Download className="h-4 w-4" />
-                Download latest dump
-              </span>
-              <span className="min-w-0 whitespace-normal break-words text-sm font-normal text-muted-foreground group-hover:text-accent-foreground">
-                Fetch the current dump from `r18.dev` and start the import automatically.
-              </span>
-            </button>
-          </div>
-          <R18AutoRefreshSection
-            settings={settings}
-            onPatch={(updates) => patchSettings(updates)}
-          />
-        </DialogContent>
-      </Dialog>
+        savePath={queueAllSavePath}
+        loading={queueAllLoading}
+        onSavePathChange={setQueueAllSavePath}
+        onSubmit={() => void handleQueueAll()}
+      />
+      <ActressImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        fileInputRef={fileInputRef}
+        importing={importing}
+        onImportLatest={() => void handleImportLatest()}
+        metadataScraperProgress={null}
+        settings={settings}
+        onPatchSettings={(updates) => patchSettings(updates)}
+      />
       <MetadataScraperDialog
         open={scraperConfigOpen}
         onOpenChange={setScraperConfigOpen}

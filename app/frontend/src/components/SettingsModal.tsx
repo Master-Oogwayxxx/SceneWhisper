@@ -36,6 +36,8 @@ import { apiUrl } from '@/api/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { cn, formatUtcTimestampToLocal } from '@/lib/utils'
+import { TaskTypePrioritySettings } from './TaskTypePrioritySettings'
+import { ProcessingHoursSettings } from './ProcessingHoursSettings'
 
 interface SettingsModalProps {
   open: boolean
@@ -1099,67 +1101,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
                 </div>
 
-                {/* Task Type Priority */}
-                {(() => {
-                  const DEFAULT_PRIORITY = ['all', 'merge', 'subtitle', 'split', 'scene', 'analyze_frame_pacing', 'nvenc_frame_pacing', 'remux']
-                  const TASK_TYPE_LABELS: Record<string, string> = {
-                    all: 'All',
-                    merge: 'Merge',
-                    subtitle: 'Subtitle',
-                    split: 'Split',
-                    scene: 'Scene',
-                    analyze_frame_pacing: 'Analyze + Frame Pacing Repair',
-                    nvenc_frame_pacing: 'Frame Pacing Repair',
-                    remux: 'Remux',
-                  }
-                  const priority: string[] = [
-                    ...(settings.task_type_priority?.length ? settings.task_type_priority : DEFAULT_PRIORITY),
-                    ...DEFAULT_PRIORITY.filter((type) => !settings.task_type_priority?.includes(type)),
-                  ]
-
-                  const move = (index: number, direction: -1 | 1) => {
-                    const next = [...priority]
-                    const target = index + direction
-                      ;[next[index], next[target]] = [next[target], next[index]]
-                    patchSettings({ task_type_priority: next })
-                  }
-
-                  return (
-                    <div className="flex flex-col gap-2.5 py-2.5 sm:gap-3 sm:py-3">
-                      <div>
-                        <Label className="text-xs font-medium sm:text-sm">Task Type Priority</Label>
-                        <p className="text-[11px] text-muted-foreground sm:text-xs">Processing order when multiple task types are queued</p>
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        {priority.map((type, index) => (
-                          <div key={type} className="flex items-center justify-between rounded border border-border bg-muted/40 px-2.5 py-1 sm:px-3 sm:py-1.5">
-                            <span className="text-xs sm:text-sm">{TASK_TYPE_LABELS[type] ?? type}</span>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5.5 w-5.5 sm:h-7 sm:w-7"
-                                disabled={index === 0}
-                                onClick={() => move(index, -1)}
-                              >
-                                <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5.5 w-5.5 sm:h-7 sm:w-7"
-                                disabled={index === priority.length - 1}
-                                onClick={() => move(index, 1)}
-                              >
-                                <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })()}
+                <TaskTypePrioritySettings
+                  priority={[...(settings.task_type_priority?.length ? settings.task_type_priority : ['all', 'merge', 'subtitle', 'split', 'scene', 'analyze_frame_pacing', 'nvenc_frame_pacing', 'remux']), ...['all', 'merge', 'subtitle', 'split', 'scene', 'analyze_frame_pacing', 'nvenc_frame_pacing', 'remux'].filter((type) => !settings.task_type_priority?.includes(type))]}
+                  onChange={(task_type_priority) => patchSettings({ task_type_priority })}
+                />
 
                 {/* Export Database */}
                 <SettingRow label="Export Database" description="Download the SQLite database file">
@@ -1218,56 +1163,14 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   </div>
                 </div>
 
-                <SettingRow label="Processing Hours" description="Only process tasks during a set time window. Start and end use your local 24-hour clock: 0 is midnight and 23 is 11 PM." className={settings.processing_hours_enabled ? "border-0" : ""}>
-                  <Switch
-                    checked={settings.processing_hours_enabled}
-                    onCheckedChange={(v) => patchSettings({ processing_hours_enabled: v })}
-                  />
-                </SettingRow>
-
-                {settings.processing_hours_enabled && (
-                  <div className="rounded-lg overflow-hidden bg-muted/30 p-3">
-                    <div className="grid grid-cols-[3rem_1fr] items-center gap-2 px-1 pb-2 text-[11px] font-medium text-muted-foreground sm:grid-cols-[4rem_1fr] sm:gap-3 sm:text-xs">
-                      <span>Day</span>
-                      <div className="grid grid-cols-[3.5rem_3.25rem_3.25rem] justify-end gap-1.5 text-right sm:grid-cols-[4rem_4rem_4rem] sm:gap-2">
-                        <span>Run</span>
-                        <span>Start</span>
-                        <span>End</span>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      {PROCESSING_DAYS.map(({ key, settingKey, label }) => (
-                        <div key={key} className="grid grid-cols-[3rem_1fr] items-center gap-2 rounded-md px-1 py-1.5 sm:grid-cols-[4rem_1fr] sm:gap-3">
-                          <Label className="text-xs font-medium sm:text-sm">{label}</Label>
-                          <div className="grid grid-cols-[3.5rem_3.25rem_3.25rem] justify-end gap-1.5 sm:grid-cols-[4rem_4rem_4rem] sm:gap-2">
-                            <div className="flex h-8 items-center justify-end">
-                              <Switch
-                                checked={Boolean(settings[settingKey])}
-                                onCheckedChange={(v) => patchSettings({ [settingKey]: v })}
-                              />
-                            </div>
-                            <Input
-                              type="number"
-                              min={0}
-                              max={23}
-                              value={localProcessingWindows[key].start}
-                              onChange={(e) => updateProcessingWindow(key, 'start', Number(e.target.value))}
-                              className="h-8 w-[3.25rem] text-right text-xs sm:w-16 sm:text-sm"
-                            />
-                            <Input
-                              type="number"
-                              min={0}
-                              max={23}
-                              value={localProcessingWindows[key].end}
-                              onChange={(e) => updateProcessingWindow(key, 'end', Number(e.target.value))}
-                              className="h-8 w-[3.25rem] text-right text-xs sm:w-16 sm:text-sm"
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <ProcessingHoursSettings
+                  enabled={settings.processing_hours_enabled}
+                  windows={localProcessingWindows}
+                  settings={settings}
+                  onToggle={(processing_hours_enabled) => patchSettings({ processing_hours_enabled })}
+                  onDayToggle={(settingKey, value) => patchSettings({ [settingKey]: value })}
+                  onWindowChange={updateProcessingWindow}
+                />
               </TabsContent>
 
               <TabsContent value="behavior" className="mt-0">

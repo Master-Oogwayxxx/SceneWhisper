@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Skeleton } from './ui/skeleton'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu'
 import { cn } from '../lib/utils'
+import { PageSizeSelect } from './PageSizeSelect'
 import { TaskCard } from './TaskCard'
 import TaskSorting, { type TaskSortField } from './TaskSorting'
 import { BulkProgressDialog } from './BulkProgressDialog'
@@ -865,16 +866,7 @@ export function TaskQueue({
         <div className='grid flex-none shrink-0 grid-cols-1 items-center gap-1.5 pt-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-2'>
             <div className='hidden items-center gap-1.5 sm:flex sm:gap-2'>
               <span className='text-xs text-muted-foreground whitespace-nowrap sm:text-sm'>Per page:</span>
-              <Select value={String(pageSize)} onValueChange={val => { onPageSizeChange(Number(val)); onPageChange(1) }}>
-                <SelectTrigger className='h-8 w-[68px] text-xs sm:h-[32px] sm:w-[72px] sm:text-sm'>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className='min-w-0 w-[68px] sm:w-[72px]'>
-                  {[10, 25, 50, 100, 250, 500, 1000].map(n => (
-                    <SelectItem key={n} value={String(n)} className='pl-2 text-xs sm:text-sm [&>span:first-child]:hidden'>{n}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <PageSizeSelect value={pageSize} options={[10, 25, 50, 100, 250, 500, 1000]} onChange={value => { onPageSizeChange(value); onPageChange(1) }} />
             </div>
           <div className='scrollbar -mx-1 flex min-w-0 max-w-full items-center justify-center gap-1.5 overflow-x-auto px-1 sm:mx-0 sm:justify-self-center sm:gap-2 sm:px-0'>
             <button

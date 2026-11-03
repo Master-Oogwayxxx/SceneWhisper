@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { PageSizeSelect } from './PageSizeSelect';
 
 interface FileBrowserPaginationProps {
     currentPage: number;
@@ -41,24 +42,7 @@ export function FileBrowserPagination({
         <div className="grid flex-none shrink-0 grid-cols-1 items-center gap-1.5 pt-2 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-2">
             <div className={`items-center gap-1.5 sm:flex sm:gap-2 ${hideItemsPerPageOnMobile ? 'hidden' : 'flex'}`}>
                 <span className="whitespace-nowrap text-xs text-muted-foreground sm:text-sm">Per page:</span>
-                <Select
-                    value={String(itemsPerPage)}
-                    onValueChange={(val) => {
-                        setItemsPerPage(Number(val));
-                        setCurrentPage(1);
-                    }}
-                >
-                    <SelectTrigger className="h-7 w-14 px-2 text-xs sm:h-[32px] sm:w-[72px] sm:text-sm [&_svg]:h-3.5 [&_svg]:w-3.5 sm:[&_svg]:h-4 sm:[&_svg]:w-4">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="min-w-0 w-14 sm:w-[72px]">
-                        {[10, 25, 50, 100, 250, 500, 1000].map((n) => (
-                            <SelectItem key={n} value={String(n)} className="pl-2 text-xs sm:text-sm [&>span:first-child]:hidden">
-                                {n}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                <PageSizeSelect value={itemsPerPage} options={[10, 25, 50, 100, 250, 500, 1000]} onChange={(value) => { setItemsPerPage(value); setCurrentPage(1); }} />
             </div>
 
                 <div className="scrollbar -mx-1 flex min-w-0 max-w-full items-center justify-center gap-1 overflow-x-auto px-1 sm:mx-0 sm:justify-self-center sm:gap-2 sm:px-0">

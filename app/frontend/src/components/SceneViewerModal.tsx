@@ -9,7 +9,7 @@ import { sceneApi } from '@/api/scenes';
 import { apiUrl } from '@/api/client';
 import { timecodeToSeconds, secondsToTimecode, isValidTimecode } from '@/lib/timecode';
 import { copyTextToClipboard } from '@/lib/utils';
-import { Check, Copy, Crosshair, Loader2, Maximize2, Minimize2, Play, Trash2 } from 'lucide-react';
+import { Check, Copy, Crosshair, Loader2, Maximize2, Minimize2, Play, RotateCcw, Trash2 } from 'lucide-react';
 import { SceneTimeline } from './SceneTimeline';
 import { MediaPlayer, MediaProvider, useMediaStore, isVideoProvider, type MediaPlayerInstance, type MediaProviderAdapter } from '@vidstack/react';
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
@@ -117,6 +117,7 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
   const playerRef = useRef<MediaPlayerInstance>(null);
   const seekTimerRef = useRef<number | null>(null);
   const pendingSeekSecondsRef = useRef<number | null>(null);
+  const [videoReloadKey, setVideoReloadKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(() => shouldUseFullscreenByDefault());
   const { currentTime, duration: rawVideoDuration } = useMediaStore(playerRef);
   const videoSource = useMemo(() => {
@@ -874,15 +875,27 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
       }>
         <DialogHeader className="flex flex-row items-center justify-between pr-8 shrink-0">
           <DialogTitle>Scenes — {file?.name}</DialogTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setIsFullscreen(prev => !prev)}
-            aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-          >
-            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setVideoReloadKey(prev => prev + 1)}
+              aria-label="Reload video"
+              title="Reload video"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => setIsFullscreen(prev => !prev)}
+              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+          </div>
         </DialogHeader>
 
         <div className="flex flex-col flex-1 min-h-0 gap-4 overflow-hidden">
@@ -893,7 +906,7 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
             {file && (
               <div className={`${isFullscreen ? 'w-3/5' : 'w-full max-w-2xl mx-auto'} shrink-0 bg-black rounded-md overflow-hidden aspect-video relative ${isFullscreen ? 'flex items-center self-center' : 'self-start'}`}>
                 <MediaPlayer
-                  key={`${file.id}-${isOpen ? 'open' : 'closed'}`}
+                  key={`${file.id}-${isOpen ? 'open' : 'closed'}-${videoReloadKey}`}
                   ref={playerRef}
                   src={videoSource}
                   className="w-full h-full"

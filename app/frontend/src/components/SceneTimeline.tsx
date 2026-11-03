@@ -1,21 +1,12 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Scene } from '@/types/types';
-import { timecodeToSeconds, secondsToTimecode, isValidTimecode } from '@/lib/timecode';
+import { isValidTimecode, secondsToTimecode, timecodeToSeconds } from '@/lib/timecode';
 
-interface EditState {
-  start_timecode: string;
-  end_timecode: string;
-}
-
+interface EditState { start_timecode: string; end_timecode: string; }
 interface SceneTimelineProps {
-  duration: number;
-  scenes: Scene[];
-  editStates: Record<string, EditState>;
-  scenesToDelete: Set<string>;
+  duration: number; scenes: Scene[]; editStates: Record<string, EditState>; scenesToDelete: Set<string>;
   onUpdateEditState: (id: string, field: keyof EditState, value: string) => void;
-  onInitializeEditState: (scene: Scene) => void;
-  currentTime: number;
-  onSeek: (seconds: number) => void;
+  onInitializeEditState: (scene: Scene) => void; currentTime: number; onSeek: (seconds: number) => void;
 }
 
 const SCENE_COLORS = [
@@ -26,245 +17,66 @@ const SCENE_COLORS = [
   { bg: 'bg-pink-500/40', border: 'border-pink-600/80', hover: 'hover:bg-pink-500/50', handle: 'bg-pink-600/80 hover:bg-pink-700' },
   { bg: 'bg-cyan-500/40', border: 'border-cyan-600/80', hover: 'hover:bg-cyan-500/50', handle: 'bg-cyan-600/80 hover:bg-cyan-700' },
 ];
+const formatRulerTime = (seconds: number) => `${Math.floor(Math.max(0, Math.round(seconds)) / 60)}:${String(Math.max(0, Math.round(seconds)) % 60).padStart(2, '0')}`;
 
-const getSceneColor = (index: number) => SCENE_COLORS[index % SCENE_COLORS.length];
-
-export const SceneTimeline = ({
-  duration,
-  scenes,
-  editStates,
-  scenesToDelete,
-  onUpdateEditState,
-  onInitializeEditState,
-  currentTime,
-  onSeek,
-}: SceneTimelineProps) => {
+export const SceneTimeline = ({ duration, scenes, editStates, scenesToDelete, onUpdateEditState, onInitializeEditState, currentTime, onSeek }: SceneTimelineProps) => {
   const timelineRef = useRef<HTMLDivElement>(null);
-  const [draggingHandle, setDraggingHandle] = useState<{ sceneId: string; edge: 'start' | 'end' } | null>(null);
-  const [draggingPlayhead, setDraggingPlayhead] = useState(false);
+  const didDragRef = useRef(false);
+  const [dragging, setDragging] = useState<{ sceneId: string; edge: 'start' | 'end' } | 'playhead' | null>(null);
+  const [hoveredSceneId, setHoveredSceneId] = useState<string | null>(null);
 
-  // Combine saved scenes with unsaved ones from editStates (sorted by start time)
-  const allScenes = React.useMemo(() => {
-    const result: Scene[] = scenes?.filter((scene) => !scenesToDelete.has(scene.id)) ?? [];
-
+  const allScenes = useMemo(() => {
+    const result = scenes?.filter((scene) => !scenesToDelete.has(scene.id)) ?? [];
     Object.entries(editStates).forEach(([id, state]) => {
-      if (id.startsWith('new-')) {
-        result.push({
-          id,
-          start_timecode: state.start_timecode,
-          end_timecode: state.end_timecode,
-          scene_number: 0,
-          duration_seconds: 0,
-          file_id: '',
-        } as Scene);
-      }
+      if (id.startsWith('new-')) result.push({ id, start_timecode: state.start_timecode, end_timecode: state.end_timecode, scene_number: 0, duration_seconds: 0, file_id: '' } as Scene);
     });
-
-    return result.sort((a, b) => {
-      const aStart = timecodeToSeconds(editStates[a.id]?.start_timecode ?? a.start_timecode);
-      const bStart = timecodeToSeconds(editStates[b.id]?.start_timecode ?? b.start_timecode);
-      if (isNaN(aStart) || isNaN(bStart)) return 0;
-      return aStart - bStart;
-    }).map((scene, index) => ({ ...scene, scene_number: index + 1 }));
+    return result.sort((a, b) => timecodeToSeconds(editStates[a.id]?.start_timecode ?? a.start_timecode) - timecodeToSeconds(editStates[b.id]?.start_timecode ?? b.start_timecode)).map((scene, index) => ({ ...scene, scene_number: index + 1 }));
   }, [scenes, editStates, scenesToDelete]);
+  const secondsToPercent = (seconds: number) => (Math.max(0, Math.min(seconds, duration)) / duration) * 100;
+  const pixelsToSeconds = (clientX: number) => { const rect = timelineRef.current?.getBoundingClientRect(); if (!rect || rect.width <= 0) return 0; return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)) * duration; };
+  const getTimecode = (scene: Scene, field: keyof EditState) => { const value = editStates[scene.id]?.[field]; return value && isValidTimecode(value) ? value : scene[field]; };
+  const getSeconds = (scene: Scene, field: keyof EditState) => timecodeToSeconds(getTimecode(scene, field));
 
-  // Guard against division by zero
-  if (duration <= 0) {
-    return (
-      <div className="w-full h-12 bg-secondary/30 flex items-center justify-center text-xs text-muted-foreground">
-        Loading video...
-      </div>
-    );
-  }
-
-  // Calculate pixel position from seconds
-  const secondsToPercent = (seconds: number): number => {
-    const clamped = Math.max(0, Math.min(seconds, duration));
-    return (clamped / duration) * 100;
+  const updateBoundary = (clientX: number) => {
+    if (!dragging || dragging === 'playhead') return;
+    const index = allScenes.findIndex((scene) => scene.id === dragging.sceneId); if (index < 0) return;
+    const scene = allScenes[index]; const raw = pixelsToSeconds(clientX); const start = getSeconds(scene, 'start_timecode'); const end = getSeconds(scene, 'end_timecode');
+    const previousEnd = index > 0 ? getSeconds(allScenes[index - 1], 'end_timecode') : 0;
+    const nextStart = index < allScenes.length - 1 ? getSeconds(allScenes[index + 1], 'start_timecode') : duration;
+    const next = dragging.edge === 'start' ? Math.min(end, Math.max(previousEnd, raw)) : Math.max(start, Math.min(nextStart, raw));
+    onUpdateEditState(scene.id, dragging.edge === 'start' ? 'start_timecode' : 'end_timecode', secondsToTimecode(next));
   };
-
-  // Calculate seconds from cursor position on timeline
-  const pixelsToSeconds = (clientX: number): number => {
-    if (!timelineRef.current) return 0;
-    const rect = timelineRef.current.getBoundingClientRect();
-    const percent = (clientX - rect.left) / rect.width;
-    const clamped = Math.max(0, Math.min(percent, 1));
-    return clamped * duration;
+  useEffect(() => {
+    if (!dragging) return;
+    const move = (event: PointerEvent) => { didDragRef.current = true; if (dragging === 'playhead') onSeek(pixelsToSeconds(event.clientX)); else updateBoundary(event.clientX); };
+    const end = () => setDragging(null);
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', end, { once: true });
+    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', end); };
+  }, [dragging, duration, allScenes, editStates]);
+  const adjustBoundary = (scene: Scene, edge: 'start' | 'end', delta: number) => {
+    onInitializeEditState(scene); const index = allScenes.findIndex((item) => item.id === scene.id); const current = getSeconds(scene, edge === 'start' ? 'start_timecode' : 'end_timecode');
+    const start = getSeconds(scene, 'start_timecode'); const end = getSeconds(scene, 'end_timecode'); const previousEnd = index > 0 ? getSeconds(allScenes[index - 1], 'end_timecode') : 0; const nextStart = index < allScenes.length - 1 ? getSeconds(allScenes[index + 1], 'start_timecode') : duration;
+    const next = edge === 'start' ? Math.min(end, Math.max(previousEnd, current + delta)) : Math.max(start, Math.min(nextStart, current + delta));
+    onUpdateEditState(scene.id, edge === 'start' ? 'start_timecode' : 'end_timecode', secondsToTimecode(next));
   };
+  if (duration <= 0) return <div className="w-full h-16 bg-secondary/30 flex items-center justify-center text-xs text-muted-foreground">Video duration unavailable</div>;
+  const tickCount = Math.min(12, Math.max(2, Math.ceil(duration / 30) + 1)); const ticks = Array.from({ length: tickCount }, (_, index) => (duration * index) / (tickCount - 1));
 
-  // Handle pointer down on a drag handle
-  const handlePointerDown = (e: React.PointerEvent, sceneId: string, edge: 'start' | 'end', scene: Scene) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setDraggingHandle({ sceneId, edge });
-    onInitializeEditState(scene);
-  };
-
-  // Handle pointer move for dragging
-  const handlePointerMove = (e: React.PointerEvent) => {
-    if (draggingPlayhead) {
-      const newSeconds = pixelsToSeconds(e.clientX);
-      onSeek(Math.max(0, Math.min(newSeconds, duration)));
-      return;
-    }
-
-    if (!draggingHandle) return;
-
-    const rawSeconds = pixelsToSeconds(e.clientX);
-
-    const sceneIndex = allScenes.findIndex((s) => s.id === draggingHandle.sceneId);
-    const currentEditState = editStates[draggingHandle.sceneId];
-
-    let clampedSeconds = rawSeconds;
-
-    if (draggingHandle.edge === 'end') {
-      // Cannot go below own start
-      const ownStart = timecodeToSeconds(currentEditState?.start_timecode ?? allScenes[sceneIndex]?.start_timecode ?? '00:00:00.000');
-      // Cannot go past next scene's start
-      const nextScene = allScenes[sceneIndex + 1];
-      const nextStart = nextScene
-        ? timecodeToSeconds(editStates[nextScene.id]?.start_timecode ?? nextScene.start_timecode)
-        : duration;
-      clampedSeconds = Math.max(ownStart, Math.min(rawSeconds, nextStart));
-    } else {
-      // Cannot go above own end
-      const ownEnd = timecodeToSeconds(currentEditState?.end_timecode ?? allScenes[sceneIndex]?.end_timecode ?? secondsToTimecode(duration));
-      // Cannot go before previous scene's end
-      const prevScene = allScenes[sceneIndex - 1];
-      const prevEnd = prevScene
-        ? timecodeToSeconds(editStates[prevScene.id]?.end_timecode ?? prevScene.end_timecode)
-        : 0;
-      clampedSeconds = Math.min(ownEnd, Math.max(rawSeconds, prevEnd));
-    }
-
-    onUpdateEditState(
-      draggingHandle.sceneId,
-      draggingHandle.edge === 'start' ? 'start_timecode' : 'end_timecode',
-      secondsToTimecode(clampedSeconds)
-    );
-  };
-
-  // Handle pointer up to end dragging
-  const handlePointerUp = (e: React.PointerEvent) => {
-    if (draggingPlayhead) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-      setDraggingPlayhead(false);
-      return;
-    }
-
-    if (draggingHandle) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-      setDraggingHandle(null);
-    }
-  };
-
-  // Handle click on empty timeline area to seek
-  const handleTimelineClick = (e: React.MouseEvent) => {
-    if (draggingHandle) return;
-    if (e.target !== timelineRef.current) return;
-
-    const newSeconds = pixelsToSeconds(e.clientX);
-    onSeek(newSeconds);
-  };
-
-  // Get timecode for a scene, checking editStates first
-  const getSceneTimecode = (scene: Scene, field: 'start_timecode' | 'end_timecode'): string => {
-    const edited = editStates[scene.id];
-    if (edited) {
-      const value = edited[field];
-      return isValidTimecode(value) ? value : scene[field];
-    }
-    return scene[field];
-  };
-
-
-  return (
-    <div className="relative w-full h-14 overflow-visible">
-      <div
-        ref={timelineRef}
-        onClick={handleTimelineClick}
-        className="absolute inset-0 bg-secondary/30 border border-secondary/50 cursor-pointer overflow-hidden flex items-center"
-      >
-        {/* Scene blocks */}
-        {allScenes.map((scene, index) => {
-          const startTimecode = getSceneTimecode(scene, 'start_timecode');
-          const endTimecode = getSceneTimecode(scene, 'end_timecode');
-
-          const startSeconds = timecodeToSeconds(startTimecode);
-          const endSeconds = timecodeToSeconds(endTimecode);
-
-          if (isNaN(startSeconds) || isNaN(endSeconds)) return null;
-
-          const leftPercent = secondsToPercent(startSeconds);
-          const widthPercent = secondsToPercent(endSeconds) - leftPercent;
-
-          const colors = getSceneColor(index);
-
-          return (
-            <div
-              key={scene.id}
-            className="absolute h-4/5 top-1/10 flex items-center group"
-            style={{
-              left: `${leftPercent}%`,
-              width: `${widthPercent}%`,
-            }}
-          >
-              {/* Scene block */}
-              <div
-                onClick={() => onSeek(startSeconds)}
-                className={`absolute inset-0 ${colors.bg} border ${colors.border} ${colors.hover} transition-colors`}
-              />
-
-              {/* Scene label */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <span className="text-xs font-semibold text-white drop-shadow-md">{scene.scene_number}</span>
-              </div>
-
-              {/* Left handle */}
-              <div
-                onPointerDown={(e) => handlePointerDown(e, scene.id, 'start', scene)}
-                className={`absolute left-0 top-0 h-full w-1 ${colors.handle} cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity`}
-                aria-label={`Drag start marker for scene ${scene.scene_number}`}
-              />
-
-              {/* Right handle */}
-              <div
-                onPointerDown={(e) => handlePointerDown(e, scene.id, 'end', scene)}
-                className={`absolute right-0 top-0 h-full w-1 ${colors.handle} cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity`}
-                aria-label={`Drag end marker for scene ${scene.scene_number}`}
-              />
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Playhead */}
-      <div
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          setDraggingPlayhead(true);
-        }}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        className="absolute top-0 bottom-0 z-30 cursor-col-resize transition-all overflow-visible"
-        style={{
-          left: `${secondsToPercent(currentTime)}%`,
-          transitionDuration: draggingPlayhead ? '0s' : '0.05s',
-          transitionTimingFunction: 'linear',
-          transform: 'translateX(-50%)',
-        }}
-      >
-        {/* Larger grab area for easier dragging */}
-        <div className="absolute left-1/2 top-0 h-full w-8 -translate-x-1/2" />
-
-        {/* Top triangle marker */}
-        <div className="absolute left-1/2 top-0 z-40 -translate-x-1/2 -translate-y-[1px] pointer-events-none">
-          <div className="w-0 h-0 border-l-[8px] border-r-[8px] border-t-[10px] border-l-transparent border-r-transparent border-t-red-500 drop-shadow-sm" />
-        </div>
-
-        {/* Vertical line */}
-        <div className="absolute top-0 bottom-0 z-30 w-0.5 bg-red-500 left-1/2 transform -translate-x-1/2 pointer-events-none" />
-      </div>
+  return <div className="relative w-full h-20 overflow-visible select-none" aria-label="Scene timeline">
+    <div className="absolute inset-x-0 top-0 h-5 text-[10px] text-muted-foreground font-mono" aria-hidden="true">{ticks.map((tick) => <span key={tick} className="absolute -translate-x-1/2" style={{ left: `${secondsToPercent(tick)}%` }}>{formatRulerTime(tick)}</span>)}</div>
+    <div ref={timelineRef} onClick={(event) => { if (didDragRef.current) { didDragRef.current = false; return; } onSeek(pixelsToSeconds(event.clientX)); }} className="absolute inset-x-0 top-6 bottom-0 bg-secondary/30 border border-secondary/50 cursor-pointer overflow-hidden">
+      {ticks.map((tick) => <div key={`grid-${tick}`} className="absolute top-0 bottom-0 border-l border-secondary/40" style={{ left: `${secondsToPercent(tick)}%` }} aria-hidden="true" />)}
+      {allScenes.map((scene, index) => {
+        const start = getSeconds(scene, 'start_timecode'); const end = getSeconds(scene, 'end_timecode'); if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+        const colors = SCENE_COLORS[index % SCENE_COLORS.length]; const edited = Boolean(editStates[scene.id]); const active = currentTime >= start && currentTime <= end; const width = Math.max(secondsToPercent(end) - secondsToPercent(start), 0.35); const label = `Scene ${scene.scene_number}: ${secondsToTimecode(start)} to ${secondsToTimecode(end)}${edited ? ' (unsaved)' : ''}`;
+        return <div key={scene.id} className="absolute top-1 bottom-1 group" style={{ left: `${secondsToPercent(start)}%`, width: `${width}%` }} onMouseEnter={() => setHoveredSceneId(scene.id)} onMouseLeave={() => setHoveredSceneId(null)}>
+          <button type="button" title={label} aria-label={label} onClick={(event) => { event.stopPropagation(); onSeek(start); }} className={`absolute inset-0 w-full border ${colors.bg} ${colors.border} ${colors.hover} ${edited ? 'border-dashed' : ''} ${active ? 'ring-2 ring-red-400 ring-inset' : ''} transition-colors`} />
+          <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-semibold text-white drop-shadow-md">{scene.scene_number}</span>
+          {(['start', 'end'] as const).map((edge) => <button key={edge} type="button" title={`Adjust scene ${scene.scene_number} ${edge}`} aria-label={`Adjust scene ${scene.scene_number} ${edge} boundary`} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); onInitializeEditState(scene); didDragRef.current = false; setDragging({ sceneId: scene.id, edge }); }} onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); adjustBoundary(scene, edge, (event.key === 'ArrowRight' ? 1 : -1) * (event.shiftKey ? 1 : 0.01)); } }} className={`absolute ${edge === 'start' ? 'left-0' : 'right-0'} top-0 z-10 h-full w-2 ${colors.handle} cursor-ew-resize opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-white`} />)}
+          {hoveredSceneId === scene.id && <span className="absolute left-1/2 bottom-full z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded bg-popover px-2 py-1 text-[10px] text-popover-foreground shadow-md pointer-events-none">{label}</span>}
+        </div>;
+      })}
     </div>
-  );
+    <div role="slider" aria-label="Video position" aria-valuemin={0} aria-valuemax={duration} aria-valuenow={Math.max(0, Math.min(currentTime, duration))} tabIndex={0} onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); onSeek(Math.max(0, Math.min(duration, currentTime + (event.key === 'ArrowRight' ? 1 : -1)))); } }} onPointerDown={(event) => { event.preventDefault(); didDragRef.current = false; setDragging('playhead'); }} className="absolute top-5 bottom-0 z-30 w-8 -translate-x-1/2 cursor-col-resize focus:outline-none focus:ring-2 focus:ring-red-400" style={{ left: `${secondsToPercent(currentTime)}%` }}><div className="absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2 bg-red-500 pointer-events-none" /><div className="absolute left-1/2 top-0 z-40 -translate-x-1/2 -translate-y-px border-l-[8px] border-r-[8px] border-t-[10px] border-l-transparent border-r-transparent border-t-red-500 pointer-events-none" /></div>
+  </div>;
 };

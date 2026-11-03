@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Database, Download, ListOrdered, Loader2, Search, Star, User, X } from 'lucide-react'
 import { toast } from 'sonner'
-import { ActressDetail, ActressDownloadMonitor, ActressSummary, ActressWork, DownloadQueueItem, MetadataScraperConfig, R18Status } from '@/types/types'
+import { ActressDetail, ActressDownloadMonitor, ActressSummary, ActressWork, DownloadQueueItem, MetadataScraperConfig, R18Status, ScraperSource } from '@/types/types'
 import {
   useR18ActressDetail,
   useR18ActressSearch,
@@ -279,6 +279,8 @@ export const ActressTab = () => {
   const [selectorDraft, setSelectorDraft] = useState<Record<string, string>>({})
   const [scraperConfigDraft, setScraperConfigDraft] = useState<MetadataScraperConfig>(EMPTY_METADATA_SCRAPER_CONFIG)
   const [metadataScraperProgress, setMetadataScraperProgress] = useState<MetadataScraperProgress | null>(null)
+  const [metadataScraperSchedule, setMetadataScraperSchedule] = useState<ScraperSource['schedule']>({ interval: 'daily', time: '03:00' })
+  const [metadataScraperScheduleActive, setMetadataScraperScheduleActive] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set())
   const [selectedWorks, setSelectedWorks] = useState<ActressWork[]>([])
@@ -812,6 +814,8 @@ export const ActressTab = () => {
         actressId: detail.id,
         actressName: formatActressName(detail, actressCustomNames),
         actressUrl: actressUrlDraft.trim(),
+        isActive: metadataScraperScheduleActive,
+        schedule: metadataScraperSchedule,
         onProgress: setMetadataScraperProgress,
         onComplete: (count) => { videoCount = count },
       })
@@ -835,18 +839,14 @@ export const ActressTab = () => {
     const config = {
       ...EMPTY_METADATA_SCRAPER_CONFIG,
       ...settings.metadata_scraper_config,
-      available_fields: settings.metadata_scraper_config?.available_fields ?? [],
+      available_fields: [],
+      selectors: '',
     }
-    let selectors: Record<string, string> = {}
-    try { selectors = JSON.parse(config.selectors || '{}') as Record<string, string> } catch { selectors = {} }
+    const selectors: Record<string, string> = {}
     setScraperConfigDraft(config)
     setSelectorDraft(selectors)
     const savedActressUrl = detail ? settings.metadata_scraper_actress_urls?.[String(detail.id)] ?? '' : ''
-    const defaultTemplateUrl = settings.metadata_scraper_templates?.[0]?.config.actress_url
-    const templateUrl = defaultTemplateUrl
-      ? defaultTemplateUrl.split('{actress_name}').join(encodeURIComponent(detail ? formatActressName(detail, actressCustomNames) : ''))
-      : ''
-    setActressUrlDraft(savedActressUrl || templateUrl)
+    setActressUrlDraft(savedActressUrl)
     setScraperConfigOpen(true)
   }
 
@@ -1432,6 +1432,10 @@ export const ActressTab = () => {
         selectors={selectorDraft}
         onSelectorsChange={setSelectorDraft}
         onSave={() => void saveScraperConfig()}
+        schedule={metadataScraperSchedule}
+        onScheduleChange={setMetadataScraperSchedule}
+        scheduleActive={metadataScraperScheduleActive}
+        onScheduleActiveChange={setMetadataScraperScheduleActive}
       />
     </div>
   )

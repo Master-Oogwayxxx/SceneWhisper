@@ -1,5 +1,5 @@
 import { scraperApi } from '@/api/scraper'
-import { MetadataScraperConfig } from '@/types/types'
+import { MetadataScraperConfig, ScraperSource } from '@/types/types'
 
 export const EMPTY_METADATA_SCRAPER_CONFIG: MetadataScraperConfig = {
   site_name: '', base_url: '', movie_url: '', actress_url: '', listing_url: '', pagination: '',
@@ -19,24 +19,30 @@ interface RunMetadataScraperOptions {
   actressId: number
   actressName: string
   actressUrl: string
+  isActive: boolean
   onProgress: (progress: MetadataScraperProgress) => void
   onComplete: (videoCount: number) => void
+  schedule: ScraperSource['schedule']
 }
 
-export async function runMetadataScraper({ actressId, actressName, actressUrl, onProgress, onComplete }: RunMetadataScraperOptions) {
-  const source = await scraperApi.createSource({
-    id: `metadata-${actressId}-${Date.now()}`,
+export async function runMetadataScraper({ actressId, actressName, actressUrl, isActive, schedule, onProgress, onComplete }: RunMetadataScraperOptions) {
+  const sourceId = `metadata-${actressId}`
+  const existing = (await scraperApi.getSources()).find((item) => item.id === sourceId)
+  const sourcePayload: ScraperSource = {
+    ...(existing ?? {}),
+    id: sourceId,
     name: `Metadata: ${actressName}`,
     url: actressUrl,
     urls: [actressUrl],
     urlActressNameReversed: [false],
-    schedule: { interval: 'daily', time: '03:00' },
-    isActive: true,
+    schedule,
+    isActive,
     lastFound: 0,
     lastNew: 0,
     lastPagesScraped: 0,
-    createdAt: new Date(),
-  })
+    createdAt: existing?.createdAt ?? new Date(),
+  }
+  const source = existing ? await scraperApi.updateSource(sourcePayload) : await scraperApi.createSource(sourcePayload)
 
   onProgress({ progress: 0, pagesScraped: 0, totalPages: 0, currentUrl: source.url })
   const runPromise = scraperApi.runSource({ sourceId: source.id })

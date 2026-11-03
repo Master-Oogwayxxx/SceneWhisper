@@ -178,6 +178,28 @@ def test_patch_settings_persists_external_video_targets(test_client: TestClient)
     assert resp.json()["external_video_targets"] == targets
 
 
+def test_patch_settings_persists_metadata_scraper_templates(test_client: TestClient):
+    templates = [
+        {
+            "label": "Example metadata site",
+            "config": {
+                "site_name": "Example",
+                "actress_url": "https://example.com/{actress_name}",
+                "available_fields": ["birth_date"],
+                "selectors": '{"birth_date":".birthday"}',
+                "auto_detect_pagination": True,
+                "max_pages": 5,
+            },
+        }
+    ]
+
+    resp = test_client.patch("/api/settings", json={"metadata_scraper_templates": templates})
+
+    assert resp.status_code == 200
+    assert resp.json()["metadata_scraper_templates"] == templates
+    assert test_client.get("/api/settings").json()["metadata_scraper_templates"] == templates
+
+
 def test_patch_settings_persists_r18_auto_refresh_fields(test_client: TestClient):
     payload = {
         "r18_auto_refresh_enabled": True,

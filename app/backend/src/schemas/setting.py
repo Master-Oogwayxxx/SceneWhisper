@@ -97,6 +97,7 @@ class SettingRecord(Base):
     r18_auto_refresh_last_error = Column(Text, nullable=True)
     metadata_provider = Column(String, nullable=False, default="r18")
     metadata_scraper_config = Column(Text, nullable=True)
+    metadata_scraper_templates = Column(Text, nullable=True, default=DEFAULT_METADATA_SCRAPER_TEMPLATES)
     metadata_scraper_actress_urls = Column(Text, nullable=True)
 
     # qBittorrent

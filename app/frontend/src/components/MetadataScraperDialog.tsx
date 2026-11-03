@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ActressDetail, MetadataScraperConfig, MetadataScraperTemplate } from '@/types/types'
+import { ActressDetail, MetadataScraperConfig, MetadataScraperTemplate, ScraperSource } from '@/types/types'
 import { SCRAPER_METADATA_FIELDS } from '@/lib/metadata-scraper'
 import { Button } from './ui/button'
 import { Checkbox } from './ui/checkbox'
@@ -25,16 +25,24 @@ interface MetadataScraperDialogProps {
   selectors: Record<string, string>
   onSelectorsChange: (selectors: Record<string, string>) => void
   onSave: () => void
+  schedule?: ScraperSource['schedule']
+  onScheduleChange?: (schedule: ScraperSource['schedule']) => void
+  scheduleActive?: boolean
+  onScheduleActiveChange?: (active: boolean) => void
 }
 
-export function MetadataScraperDialog({ open, onOpenChange, detail, actressName, actressUrl, onActressUrlChange, config, onConfigChange, selectors, onSelectorsChange, templates, onSaveTemplate, onSave, templateOnly = false, templateLabel = '' }: MetadataScraperDialogProps) {
+export function MetadataScraperDialog({ open, onOpenChange, detail, actressName, actressUrl, onActressUrlChange, config, onConfigChange, selectors, onSelectorsChange, templates, onSaveTemplate, onSave, schedule = { interval: 'daily', time: '03:00' }, onScheduleChange = () => undefined, scheduleActive = false, onScheduleActiveChange = () => undefined, templateOnly = false, templateLabel = '' }: MetadataScraperDialogProps) {
   const [templateNameDraft, setTemplateNameDraft] = useState(templateLabel)
+  const [selectedTemplate, setSelectedTemplate] = useState('current')
 
   useEffect(() => {
-    if (open) setTemplateNameDraft(templateLabel)
+    if (open) {
+      setTemplateNameDraft(templateLabel)
+      setSelectedTemplate('current')
+    }
   }, [open, templateLabel])
 
-  const effectiveTemplateLabel = templateNameDraft.trim() || config.site_name.trim()
+  const effectiveTemplateLabel = templateNameDraft.trim()
 
   const applyTemplate = (template: MetadataScraperTemplate) => {
     onConfigChange({ ...template.config, available_fields: [...template.config.available_fields] })
@@ -55,7 +63,7 @@ export function MetadataScraperDialog({ open, onOpenChange, detail, actressName,
             <div className="grid gap-2 sm:col-span-2">
               <Label htmlFor="scraper-template">Saved scraper template</Label>
               <div className="flex gap-2">
-                <Select defaultValue="current" onValueChange={(value) => { const template = templates[Number(value)]; if (template) applyTemplate(template) }}>
+                <Select value={selectedTemplate} onValueChange={(value) => { setSelectedTemplate(value); const template = templates[Number(value)]; if (template) applyTemplate(template) }}>
                   <SelectTrigger id="scraper-template" className="h-9 min-w-0 flex-1 text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="current">Start from current configuration</SelectItem>
@@ -63,12 +71,7 @@ export function MetadataScraperDialog({ open, onOpenChange, detail, actressName,
                   </SelectContent>
                 </Select>
                 <Input value={templateNameDraft} onChange={(e) => setTemplateNameDraft(e.target.value)} placeholder="Template name" className="w-40" />
-                <Button type="button" variant="outline" disabled={!effectiveTemplateLabel} onClick={() => onSaveTemplate(effectiveTemplateLabel, { ...config, selectors: JSON.stringify(selectors) })}>Save current</Button>
               </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="scraper-site_name">Website name</Label>
-              <Input id="scraper-site_name" value={config.site_name} placeholder="JAVDatabase" onChange={(e) => onConfigChange({ ...config, site_name: e.target.value })} />
             </div>
             {templateOnly && <div className="grid gap-2 sm:col-span-2">
               <Label htmlFor="scraper-actress-url-template">Actress page URL template</Label>
@@ -80,6 +83,7 @@ export function MetadataScraperDialog({ open, onOpenChange, detail, actressName,
               <Input id="scraper-actress-url" value={actressUrl} placeholder="https://www.javdatabase.com/idols/..." onChange={(e) => onActressUrlChange(e.target.value)} />
               <p className="text-xs text-muted-foreground">This URL is stored for this actress and will be used by the actress-specific scraper.</p>
             </div>}
+            {!templateOnly && <div className="grid gap-3 rounded-md border border-input p-3 sm:col-span-2"><div className="flex items-center justify-between"><Label htmlFor="scraper-schedule-active">Schedule metadata scraper</Label><Switch id="scraper-schedule-active" checked={scheduleActive} onCheckedChange={onScheduleActiveChange} /></div>{scheduleActive && <><div className="grid gap-3 sm:grid-cols-3"><Select value={schedule.interval} onValueChange={(value) => onScheduleChange({ ...schedule, interval: value as ScraperSource['schedule']['interval'] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="hourly">Hourly</SelectItem><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem></SelectContent></Select>{schedule.interval !== 'hourly' && <Input type="time" value={schedule.time ?? '03:00'} onChange={(e) => onScheduleChange({ ...schedule, time: e.target.value })} />}{schedule.interval === 'weekly' && <Input type="number" min={0} max={6} value={schedule.dayOfWeek ?? 1} onChange={(e) => onScheduleChange({ ...schedule, dayOfWeek: Number(e.target.value) })} aria-label="Day of week (0 Sunday)" />}</div><p className="text-xs text-muted-foreground">The scraper runs automatically after saving.</p></>}</div>}
             <div className="grid gap-2 sm:col-span-2">
               <Label htmlFor="scraper-fields">Available fields</Label>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-md border border-input p-3 sm:grid-cols-3">

@@ -594,6 +594,20 @@ async def run_due_scrapers() -> None:
             next_run = now
         if next_run <= now:
             await run_scraper_source(source)
+            if source.id.startswith("metadata-"):
+                try:
+                    actress_id = int(source.id.removeprefix("metadata-"))
+                    videos, _ = await loop.run_in_executor(
+                        None, scraper_crud.list_videos, source.id, None, 0, 100000
+                    )
+                    await loop.run_in_executor(
+                        None,
+                        scraper_crud.assign_videos_to_actresses,
+                        [video.id for video in videos],
+                        [actress_id],
+                    )
+                except ValueError:
+                    logging.warning("Ignoring malformed metadata scraper source id: %s", source.id)
 
 
 async def refresh_scraper_next_runs() -> None:

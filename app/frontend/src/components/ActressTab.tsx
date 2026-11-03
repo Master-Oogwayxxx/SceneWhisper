@@ -1077,10 +1077,10 @@ export const ActressTab = () => {
                 {isActressListLoading ? (
                   selectedId === null ? (
                     <div className="grid grid-cols-1 gap-2 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                      {Array.from({ length: 8 }).map((_, i) => <ActressGridSkeleton key={i} />)}
+                      {Array.from({ length: 16 }).map((_, i) => <ActressGridSkeleton key={i} />)}
                     </div>
                   ) : (
-                    Array.from({ length: 8 }).map((_, i) => <ActressRowSkeleton key={i} />)
+                    Array.from({ length: 16 }).map((_, i) => <ActressRowSkeleton key={i} />)
                   )
                 ) : visibleActresses.length === 0 ? (
                   <p className="p-6 text-sm text-muted-foreground text-center">

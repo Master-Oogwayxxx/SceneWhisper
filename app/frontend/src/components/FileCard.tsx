@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { File, Directory, TaskStatus } from '@/types/types';
@@ -143,6 +143,13 @@ export const FileCard = ({ item, rootPath, onClick, selected = false, onViewInfo
 
   // Prevent focus when shift-clicking by using a ref
   const cardRef = useRef<HTMLDivElement>(null);
+  const contextMenuOpenTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (contextMenuOpenTimeoutRef.current !== null) {
+      window.clearTimeout(contextMenuOpenTimeoutRef.current);
+    }
+  }, []);
 
   const copyFileName = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -219,7 +226,17 @@ export const FileCard = ({ item, rootPath, onClick, selected = false, onViewInfo
         onContextMenu={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          setIsMenuOpen(true);
+
+          if (contextMenuOpenTimeoutRef.current !== null) {
+            window.clearTimeout(contextMenuOpenTimeoutRef.current);
+          }
+
+          // Wait for the context-menu gesture to finish before mounting the
+          // menu, otherwise the release can activate the item under the pointer.
+          contextMenuOpenTimeoutRef.current = window.setTimeout(() => {
+            setIsMenuOpen(true);
+            contextMenuOpenTimeoutRef.current = null;
+          }, 150);
         }}
         tabIndex={-1}
       >

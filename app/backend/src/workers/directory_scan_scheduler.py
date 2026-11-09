@@ -18,8 +18,10 @@ _POLL_INTERVAL = 60
 _STARTUP_DELAY = 15
 _REQUEST_RETRIES = 5
 _REQUEST_RETRY_DELAY = 2
-_INTERNAL_API_URL = os.getenv("INTERNAL_API_URL", "http://127.0.0.1:8010").rstrip("/")
-_SCAN_URL = f"{_INTERNAL_API_URL}/api/directory/scan_all/stream"
+_SCAN_URL = (
+    f"{os.getenv('INTERNAL_API_URL', 'http://127.0.0.1:8010').rstrip('/')}"
+    "/api/directory/scan_all/stream"
+)
 
 
 def _parse_utc_timestamp(value: str) -> datetime:
@@ -45,10 +47,20 @@ def _get_scan_url(settings) -> str:
     if getattr(settings, "scan_schedule_mode", "all") != "selected":
         return _SCAN_URL
     selected = getattr(settings, "selected_scan_directories", None) or []
-    if not selected:
+    if isinstance(selected, str):
+        try:
+            selected = json.loads(selected)
+        except json.JSONDecodeError:
+            logging.warning("Invalid JSON in selected_scan_directories; scanning all directories")
+            selected = []
+    if not isinstance(selected, list):
+        selected = []
+    directories = [str(directory).strip() for directory in selected]
+    directories = [directory for directory in directories if directory]
+    if not directories:
         return _SCAN_URL
-    directories = quote(",".join(selected), safe=",")
-    return f"{_SCAN_URL}?directories={directories}"
+    encoded_directories = quote(",".join(directories), safe=",")
+    return f"{_SCAN_URL}?directories={encoded_directories}"
 
 
 async def run_due_directory_scan() -> bool:

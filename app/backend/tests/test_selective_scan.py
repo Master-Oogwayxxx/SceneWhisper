@@ -1,6 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -20,6 +21,7 @@ from src.schemas.scene import SceneRecord  # noqa: F401
 from src.schemas.directory_monitor import DirectoryMonitorRecord  # noqa: F401
 from src.schemas.log import LogRecord  # noqa: F401
 from src.schemas.notification import NotificationRecord  # noqa: F401
+from src.workers.directory_scan_scheduler import _get_scan_url
 
 
 @pytest.fixture(autouse=True)
@@ -95,3 +97,12 @@ def test_scan_all_stream_directories_param_accepted(client):
 
     # EventSourceResponse returns 200 with text/event-stream content type
     assert resp.status_code == 200
+
+
+def test_get_scan_url_decodes_persisted_selected_directories():
+    settings = SimpleNamespace(
+        scan_schedule_mode="selected",
+        selected_scan_directories='["alpha", "Folder With Spaces"]',
+    )
+
+    assert _get_scan_url(settings).endswith("?directories=alpha,Folder%20With%20Spaces")

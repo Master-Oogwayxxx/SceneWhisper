@@ -190,7 +190,7 @@ export const Dashboard = ({ tab, setTab, statsMinimized, highlightedTaskId, high
   const [searchFocused, setSearchFocused] = useState(false);
   const [taskQueueFilter, setTaskQueueFilter] = useState<TaskQueueFilter>(getInitialTaskQueueFilter);
   const [taskQueuePage, setTaskQueuePage] = useState(() => getQueryNumber('tasks.page', 1));
-  const [taskQueuePageSize, setTaskQueuePageSize] = useState(() => getQueryNumber('tasks.pageSize', 25));
+  const [taskQueuePageSize, setTaskQueuePageSize] = useState(() => getQueryNumber('tasks.pageSize', settings.task_queue_page_size));
   const [taskQueueAdvancedFilters, setTaskQueueAdvancedFilters] = useState<TaskFilters>(getInitialTaskFilters);
   const [taskQueueSortField, setTaskQueueSortField] = useState<TaskSortField | undefined>(getInitialTaskSortField);
   const [taskQueueSortDirection, setTaskQueueSortDirection] = useState<'asc' | 'desc' | undefined>(() => getInitialSortDirection('tasks.dir'));
@@ -336,7 +336,7 @@ export const Dashboard = ({ tab, setTab, statsMinimized, highlightedTaskId, high
     setSearchQuery: setMonitorSearchQuery,
   } = useDirectoryMonitorList(monitors, {
     initialPage: getQueryNumber('monitors.page', 1),
-    initialPageSize: getQueryPageSize('monitors.pageSize', 25),
+    initialPageSize: getQueryPageSize('monitors.pageSize', settings.directory_monitor_page_size as PageSize),
   });
 
   useEffect(() => {

@@ -18,6 +18,13 @@ interface ApiBookmarkVideoCheckResponse {
   existing: number
 }
 
+export interface UnpackNestedFoldersResponse {
+  moved: number
+  skipped: number
+  moved_files: string[]
+  skipped_files: string[]
+}
+
 function fromApiItem(item: ApiBookmarkVideoCheckItem): BookmarkVideoCheckItem {
   return {
     title: item.title,
@@ -30,6 +37,12 @@ function fromApiItem(item: ApiBookmarkVideoCheckItem): BookmarkVideoCheckItem {
 }
 
 export const toolsApi = {
+  async unpackNestedFolders(directoryIds: string[]): Promise<UnpackNestedFoldersResponse> {
+    const res = await axios.post<UnpackNestedFoldersResponse>(`${API_BASE}/tools/unpack-nested-folders`, {
+      directory_ids: directoryIds,
+    })
+    return res.data
+  },
   async previewBulkRename(options: BulkRenameOptions): Promise<BulkRenameItem[]> {
     const res = await axios.post<{ items: ApiBulkRenameItem[] }>(`${API_BASE}/tools/bulk-rename/preview`, options)
     return res.data.items.map(fromApiBulkRenameItem)

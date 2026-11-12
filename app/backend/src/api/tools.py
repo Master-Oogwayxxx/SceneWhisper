@@ -3,6 +3,7 @@ import json
 import math
 import os
 import re
+import shutil
 import statistics
 import subprocess
 import threading
@@ -25,6 +26,7 @@ from ..crud.setting import get_settings
 from ..models.models import BookmarkMatchedFile, BookmarkVideoCheckRequest, BookmarkVideoCheckResponse
 from ..schemas.db_helper import close_db, get_db
 from ..schemas.file import FileRecord
+from ..schemas.directory import DirectoryRecord
 from ..schemas.frame_pacing_analysis import FramePacingAnalysisRunRecord
 from ..utils import is_pyscenedetect_split
 
@@ -166,6 +168,74 @@ class BulkRenameUndoItem(BaseModel):
 
 class BulkRenameUndoRequest(BaseModel):
     items: list[BulkRenameUndoItem]
+
+
+class UnpackNestedFoldersRequest(BaseModel):
+    directory_ids: list[str]
+
+
+class UnpackNestedFoldersResponse(BaseModel):
+    moved: int
+    skipped: int
+    moved_files: list[str] = []
+    skipped_files: list[str] = []
+
+
+@router.post("/unpack-nested-folders", response_model=UnpackNestedFoldersResponse)
+async def unpack_nested_folders(body: UnpackNestedFoldersRequest):
+    if not body.directory_ids:
+        raise HTTPException(status_code=400, detail="At least one directory must be selected")
+
+    db = get_db()
+    try:
+        selected = db.query(DirectoryRecord).filter(DirectoryRecord.id.in_(body.directory_ids)).all()
+        selected_by_id = {directory.id: directory for directory in selected}
+        missing_ids = [directory_id for directory_id in body.directory_ids if directory_id not in selected_by_id]
+        if missing_ids:
+            raise HTTPException(status_code=404, detail=f"Directory not found: {missing_ids[0]}")
+
+        roots = [(directory.id, os.path.abspath(directory.path)) for directory in selected]
+        files = db.query(FileRecord).filter(
+            FileRecord.file_type == "video",
+            FileRecord.is_deleted.is_(False),
+        ).all()
+        moved_files: list[str] = []
+        skipped_files: list[str] = []
+        for file_record in files:
+            source = os.path.abspath(file_record.path)
+            matching_root = None
+            for directory_id, root in roots:
+                try:
+                    is_nested = os.path.commonpath((source, root)) == root and source != root
+                except ValueError:
+                    is_nested = False
+                if is_nested:
+                    matching_root = (directory_id, root)
+                    break
+            if matching_root is None:
+                continue
+            directory_id, root = matching_root
+            destination = os.path.join(root, file_record.name)
+            if os.path.exists(destination) and os.path.abspath(destination) != source:
+                skipped_files.append(file_record.path)
+                continue
+            try:
+                shutil.move(file_record.path, destination)
+            except (OSError, shutil.Error):
+                skipped_files.append(file_record.path)
+                continue
+            file_record.path = destination
+            file_record.directory_id = directory_id
+            moved_files.append(destination)
+        db.commit()
+        return {
+            "moved": len(moved_files),
+            "skipped": len(skipped_files),
+            "moved_files": moved_files,
+            "skipped_files": skipped_files,
+        }
+    finally:
+        close_db(db)
 
 
 def _bulk_rename_name(name: str, options: BulkRenameOptions) -> str:

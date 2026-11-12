@@ -456,6 +456,13 @@ export interface AppSettings {
   show_actress_work_titles: boolean
   default_sort_field: string
   default_sort_direction: 'asc' | 'desc'
+  file_browser_page_size: number
+  directory_monitor_page_size: number
+  task_queue_page_size: number
+  scraper_source_page_size: number
+  scraper_video_page_size: number
+  actress_works_page_size: number
+  deleted_history_page_size: number
   monitor_sort_field: string
   monitor_sort_direction: 'asc' | 'desc'
 

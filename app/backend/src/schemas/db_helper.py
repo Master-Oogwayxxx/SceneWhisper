@@ -902,12 +902,31 @@ def _ensure_metadata_provider_column() -> None:
             conn.commit()
 
 
+def _ensure_pagination_settings_columns() -> None:
+    with engine.connect() as conn:
+        cols = {row[1] for row in conn.execute(text("PRAGMA table_info(settings)"))}
+        migrations = {
+            "file_browser_page_size": "INTEGER NOT NULL DEFAULT 25",
+            "directory_monitor_page_size": "INTEGER NOT NULL DEFAULT 25",
+            "task_queue_page_size": "INTEGER NOT NULL DEFAULT 25",
+            "scraper_source_page_size": "INTEGER NOT NULL DEFAULT 25",
+            "scraper_video_page_size": "INTEGER NOT NULL DEFAULT 15",
+            "actress_works_page_size": "INTEGER NOT NULL DEFAULT 50",
+            "deleted_history_page_size": "INTEGER NOT NULL DEFAULT 50",
+        }
+        for column, definition in migrations.items():
+            if column not in cols:
+                conn.execute(text(f"ALTER TABLE settings ADD COLUMN {column} {definition}"))
+        conn.commit()
+
+
 def init_db():
     """Initialize database tables"""
     from ..log_handler import mark_db_ready
 
     Base.metadata.create_all(bind=engine)
     _ensure_metadata_provider_column()
+    _ensure_pagination_settings_columns()
     _ensure_ignore_patterns_column()
     _ensure_merge_input_paths_column()
     _ensure_selected_scan_directories_column()

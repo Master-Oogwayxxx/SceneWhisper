@@ -261,7 +261,7 @@ export const ActressTab = () => {
     const value = Number(new URLSearchParams(window.location.search).get('worksPageSize'))
     return [10, 15, 25, 50, 100, 250, 500, 1000].includes(value)
       ? value
-      : window.innerWidth >= 1921 ? 50 : 25
+      : settings.actress_works_page_size
   })
   const [worksSortBy, setWorksSortBy] = useState(() => {
     const value = new URLSearchParams(window.location.search).get('worksSort')

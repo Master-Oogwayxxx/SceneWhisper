@@ -23,6 +23,15 @@ class SettingRecord(Base):
     default_sort_field = Column(String, nullable=False, default="created_at")
     default_sort_direction = Column(String, nullable=False, default="desc")
 
+    # Pagination defaults
+    file_browser_page_size = Column(Integer, nullable=False, default=25)
+    directory_monitor_page_size = Column(Integer, nullable=False, default=25)
+    task_queue_page_size = Column(Integer, nullable=False, default=25)
+    scraper_source_page_size = Column(Integer, nullable=False, default=25)
+    scraper_video_page_size = Column(Integer, nullable=False, default=15)
+    actress_works_page_size = Column(Integer, nullable=False, default=50)
+    deleted_history_page_size = Column(Integer, nullable=False, default=50)
+
     # Processing
     scene_detector = Column(String, nullable=False, default="threshold")  # "threshold" or "content"
     scene_content_threshold = Column(Float, nullable=False, default=45)

@@ -7,8 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FileBrowserPagination } from '@/components/FileBrowserPagination'
+import { useSettings } from '@/hooks/useSettings'
 
-const DEFAULT_PAGE_SIZE = 50
 const REFRESH_SPIN_MIN_MS = 600
 
 const FILE_TYPE_OPTIONS = [
@@ -167,7 +167,8 @@ export function DeletedHistoryTab() {
   const [submittedSearch, setSubmittedSearch] = useState('')
   const [fileType, setFileType] = useState('')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const { settings } = useSettings()
+  const [pageSize, setPageSize] = useState(settings.deleted_history_page_size)
   const [isRefreshSpinning, setIsRefreshSpinning] = useState(false)
 
   const query = useQuery({

@@ -73,7 +73,7 @@ export function FileTasksDialog({ file, open, onOpenChange }: FileTasksDialogPro
 
         <div className="overflow-y-auto flex-1 min-h-0">
           {isLoading && (
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3 min-[1920px]:flex-row">
               <Skeleton className="h-24 w-full" />
               <Skeleton className="h-24 w-full" />
             </div>
@@ -90,9 +90,11 @@ export function FileTasksDialog({ file, open, onOpenChange }: FileTasksDialogPro
           )}
 
           {!isLoading && !error && tasks.length > 0 && (
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2 min-[1920px]:flex-row">
               {tasks.map((task) => (
-                <TaskCard key={task.id} task={task} compact onUnpauseTask={handleUnpause} onDeleteTask={handleDeleteTask} />
+                <div key={task.id} className="min-w-0 min-[1920px]:flex-1">
+                  <TaskCard task={task} compact onUnpauseTask={handleUnpause} onDeleteTask={handleDeleteTask} />
+                </div>
               ))}
             </div>
           )}

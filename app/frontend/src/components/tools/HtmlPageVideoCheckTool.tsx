@@ -410,7 +410,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
 
       <div className="flex flex-col gap-2 border-b border-border px-3 py-2 sm:flex-row sm:items-center">
         <div className="min-w-0 truncate text-xs text-muted-foreground">
-          {sourceLabel ? `${sourceLabel} - ${items.length} video link${items.length === 1 ? '' : 's'}` : 'Choose HTML page exports or paste HTML code'}
+          {sourceLabel ? `${sourceLabel} - ${filteredItems.length} video link${filteredItems.length === 1 ? '' : 's'}` : 'Choose HTML page exports or paste HTML code'}
         </div>
         <div className="flex shrink-0 flex-col gap-2 sm:ml-auto sm:flex-row sm:items-center">
           <div className="flex shrink-0 gap-1.5 sm:gap-2">

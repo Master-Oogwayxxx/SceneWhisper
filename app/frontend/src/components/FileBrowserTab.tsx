@@ -28,6 +28,7 @@ import { File, Directory, DirectoryRecord, FilesResponse, GroupedFilesResponse, 
 import { fileApi } from '@/api/files';
 import { directoryApi } from '@/api/directories';
 import { taskApi } from '@/api/tasks';
+import { useSettings } from '@/hooks/useSettings';
 import { sceneApi } from '@/api/scenes';
 import FileFilterDialog from './FileFilterDialog';
 import { DateRange, EMPTY_FILE_FILTER_STATE, FileFilterState, FileFormat, FileResolution, FileSizeOperator, FileStatus, FileType, isFileFilterActive } from '@/lib/file-filters';
@@ -301,6 +302,7 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
     highlightFileId,
     isActive,
 }) => {
+    const { settings } = useSettings();
     const queryClient = useQueryClient();
     const cancelTaskMutation = useCancelTask();
     const deleteTaskMutation = useDeleteTask();
@@ -320,7 +322,7 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
     const [fileTasksTarget, setFileTasksTarget] = useState<File | null>(null);
     const [isSubtitleEditorOpen, setIsSubtitleEditorOpen] = useState(false);
     const [sceneViewerFile, setSceneViewerFile] = useState<File | null>(null);
-    const defaultItemsPerPage = typeof window !== 'undefined' && window.innerWidth >= 1921 ? 50 : 25;
+    const defaultItemsPerPage = settings.file_browser_page_size;
     const [currentPage, setCurrentPage] = useState(() => getQueryNumber('page', 1));
     const [itemsPerPage, setItemsPerPage] = useState(() => getQueryNumber('pageSize', defaultItemsPerPage));
     const [selectedDirectoryIds, setSelectedDirectoryIds] = useState<string[]>(initialFileFilters.selectedDirectoryIds);
@@ -1543,7 +1545,6 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
         setIsGroupedView(false);
         setDraftSelectedDirectoryIds([]);
         setSelectedDirectoryIds([]);
-        handleFileSearchQueryChange('');
         setIsFilterDialogOpen(false);
         setIsFilterActive(false);
         setCurrentPage(1);

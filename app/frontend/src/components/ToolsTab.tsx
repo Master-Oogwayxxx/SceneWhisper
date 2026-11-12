@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Activity, FileCode2, FileSearch, FilePenLine, Layers3, ListChecks, Subtitles } from 'lucide-react'
+import { Activity, FileCode2, FileSearch, FilePenLine, FolderTree, Layers3, ListChecks, Subtitles } from 'lucide-react'
 import { BookmarkVideoCheckTool } from './tools/BookmarkVideoCheckTool'
 import { DuplicateFinderTool } from './tools/DuplicateFinderTool'
 import { VideoCodeMatcherTool } from './tools/VideoCodeMatcherTool'
@@ -7,8 +7,9 @@ import { FramePacingAnalyzerTool } from './tools/FramePacingAnalyzerTool'
 import { SubtitleHealthCheckTool } from './tools/SubtitleHealthCheckTool'
 import { HtmlPageVideoCheckTool } from './tools/HtmlPageVideoCheckTool'
 import { BulkFileRenameTool } from './tools/BulkFileRenameTool'
+import { UnpackNestedFoldersTool } from './tools/UnpackNestedFoldersTool'
 
-type ActiveTool = 'bookmarks' | 'html-page-videos' | 'duplicates' | 'codes' | 'frame-pacing' | 'subtitle-health' | 'bulk-rename' | null
+type ActiveTool = 'bookmarks' | 'html-page-videos' | 'duplicates' | 'codes' | 'frame-pacing' | 'subtitle-health' | 'bulk-rename' | 'unpack-nested' | null
 
 const AVAILABLE_TOOLS = [
   {
@@ -17,6 +18,7 @@ const AVAILABLE_TOOLS = [
     description: 'Preview cleaned video filenames with code extraction, resolution removal, and separator normalization.',
     Icon: FilePenLine,
   },
+  { id: 'unpack-nested' as const, name: 'Unpack Nested Folders', description: 'Move indexed videos from nested folders into selected directory roots.', Icon: FolderTree },
   {
     id: 'frame-pacing' as const,
     name: 'Frame Pacing Analyzer',
@@ -84,6 +86,7 @@ export function ToolsTab() {
   if (activeTool === 'bulk-rename') {
     return <BulkFileRenameTool onBack={() => setActiveTool(null)} />
   }
+  if (activeTool === 'unpack-nested') return <UnpackNestedFoldersTool onBack={() => setActiveTool(null)} />
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background shadow sm:rounded-lg">

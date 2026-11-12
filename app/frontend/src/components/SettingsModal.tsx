@@ -341,7 +341,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [metadataTemplateDraft, setMetadataTemplateDraft] = useState(EMPTY_METADATA_SCRAPER_CONFIG)
   const [metadataTemplateSelectors, setMetadataTemplateSelectors] = useState<Record<string, string>>({})
   const [metadataTemplateEditIndex, setMetadataTemplateEditIndex] = useState<number | null>(null)
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   // Local state for editing processing hours (in user's timezone)
   const [localProcessingWindows, setLocalProcessingWindows] = useState(() => processingWindowsToLocal(settings))
@@ -902,7 +902,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => { if (!next && isBusy) return; onOpenChange(next) }}>
-        <DialogContent className={`flex flex-col overflow-hidden ${isFullscreen ? 'h-[100dvh] max-h-[100dvh] w-screen max-w-none rounded-none' : 'h-[100dvh] max-h-[100dvh] w-screen max-w-none rounded-none sm:h-auto sm:max-h-[95vh] sm:w-full sm:max-w-xl sm:rounded-lg'}`}>
+        <DialogContent className={`flex flex-col overflow-hidden h-[100dvh] max-h-[100dvh] w-screen max-w-none rounded-none sm:h-auto sm:max-h-[95vh] sm:w-full sm:rounded-lg ${isExpanded ? 'sm:max-w-4xl' : 'sm:max-w-xl'}`}>
           <DialogHeader className="flex flex-row items-center">
             <DialogTitle className="text-base sm:text-lg">Settings</DialogTitle>
             <Button
@@ -910,11 +910,11 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               variant="ghost"
               size="icon"
               className="absolute right-12 top-2.5 h-4 w-4 p-0"
-              onClick={() => setIsFullscreen((value) => !value)}
-              aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              onClick={() => setIsExpanded((value) => !value)}
+              aria-label={isExpanded ? 'Reduce dialog size' : 'Enlarge dialog'}
+              title={isExpanded ? 'Reduce dialog size' : 'Enlarge dialog'}
             >
-              {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+              {isExpanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
             </Button>
           </DialogHeader>
 
@@ -1203,6 +1203,31 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     </SelectContent>
                   </Select>
                 </SettingRow>
+                <div className="border-t border-border pt-3 mt-3 mb-1">
+                  <Label className="text-xs font-medium sm:text-sm">Pagination defaults</Label>
+                  <p className="text-[11px] text-muted-foreground sm:text-xs">Choose the initial number of rows shown by each paginated page.</p>
+                </div>
+                {([
+                  ['file_browser_page_size', 'File Browser'],
+                  ['directory_monitor_page_size', 'Directory Monitors'],
+                  ['task_queue_page_size', 'Task Queue'],
+                  ['scraper_source_page_size', 'Scraper Sources'],
+                  ['scraper_video_page_size', 'Scraper Videos'],
+                  ['actress_works_page_size', 'Actress Works'],
+                  ['deleted_history_page_size', 'Deleted History'],
+                ] as const).map(([key, label]) => (
+                  <SettingRow key={key} label={label}>
+                    <Input
+                      type="number"
+                      min={10}
+                      max={1000}
+                      step={5}
+                      className="h-8 w-24 text-xs sm:h-9 sm:text-sm"
+                      value={settings[key]}
+                      onChange={(event) => patchSettings({ [key]: Math.max(10, Math.min(1000, Number(event.target.value) || 10)) })}
+                    />
+                  </SettingRow>
+                ))}
                 <SettingRow label="Default sort field">
                   <Select
                     value={settings.default_sort_field}

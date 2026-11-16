@@ -1217,15 +1217,17 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   ['deleted_history_page_size', 'Deleted History'],
                 ] as const).map(([key, label]) => (
                   <SettingRow key={key} label={label}>
-                    <Input
-                      type="number"
-                      min={10}
-                      max={1000}
-                      step={5}
-                      className="h-8 w-24 text-xs sm:h-9 sm:text-sm"
-                      value={settings[key]}
-                      onChange={(event) => patchSettings({ [key]: Math.max(10, Math.min(1000, Number(event.target.value) || 10)) })}
-                    />
+                    <Select
+                      value={String(settings[key])}
+                      onValueChange={(value) => patchSettings({ [key]: Number(value) })}
+                    >
+                      <SelectTrigger className={cn(compactSelectClass, "w-24 sm:w-28")}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {[10, 15, 25, 50, 100, 250, 500, 1000].map((size) => (
+                          <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </SettingRow>
                 ))}
                 <SettingRow label="Default sort field">

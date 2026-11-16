@@ -1211,6 +1211,20 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
         setIsDialogOpen(true);
     };
 
+    const handleMergeSelectedFiles = async () => {
+        if (selectedFiles.length < 2) return;
+
+        try {
+            await taskApi.mergeFiles(selectedFiles.map((file) => file.id));
+            toast.success(`Merge task created for ${selectedFiles.length} files`);
+            setSelectedFiles([]);
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['stats'] });
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to create merge task');
+        }
+    };
+
     const moveSingleFile = (file: File) => {
         setSelectedFiles([file]);
         openFileMoveDialog(file);
@@ -1809,6 +1823,7 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
             layoutMode={layoutMode}
             singleSelectedFile={singleSelectedFile}
             setIsDialogOpen={setIsDialogOpen}
+            onMergeFiles={() => void handleMergeSelectedFiles()}
             openFileMoveDialog={openFileMoveDialog}
             splitDisableableSelectedFiles={splitDisableableSelectedFiles}
             subtitleDisableableSelectedFiles={subtitleDisableableSelectedFiles}

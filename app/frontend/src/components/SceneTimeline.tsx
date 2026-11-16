@@ -24,6 +24,7 @@ export const SceneTimeline = ({ duration, scenes, editStates, scenesToDelete, on
   const didDragRef = useRef(false);
   const [dragging, setDragging] = useState<{ sceneId: string; edge: 'start' | 'end' } | 'playhead' | null>(null);
   const [hoveredSceneId, setHoveredSceneId] = useState<string | null>(null);
+  const [hoveredTime, setHoveredTime] = useState<number | null>(null);
 
   const allScenes = useMemo(() => {
     const result = scenes?.filter((scene) => !scenesToDelete.has(scene.id)) ?? [];
@@ -63,8 +64,24 @@ export const SceneTimeline = ({ duration, scenes, editStates, scenesToDelete, on
   const tickCount = Math.min(12, Math.max(2, Math.ceil(duration / 30) + 1)); const ticks = Array.from({ length: tickCount }, (_, index) => (duration * index) / (tickCount - 1));
 
   return <div className="relative w-full h-20 overflow-visible select-none" aria-label="Scene timeline">
-    <div className="absolute inset-x-0 top-0 h-5 text-[10px] text-muted-foreground font-mono" aria-hidden="true">{ticks.map((tick) => <span key={tick} className="absolute -translate-x-1/2" style={{ left: `${secondsToPercent(tick)}%` }}>{formatRulerTime(tick)}</span>)}</div>
-    <div ref={timelineRef} onClick={(event) => { if (didDragRef.current) { didDragRef.current = false; return; } onSeek(pixelsToSeconds(event.clientX)); }} className="absolute inset-x-0 top-6 bottom-0 bg-secondary/30 border border-secondary/50 cursor-pointer overflow-hidden">
+    <div className="absolute inset-x-0 top-0 h-5 text-xs text-muted-foreground font-mono" aria-hidden="true">{ticks.map((tick) => <span key={tick} className="absolute -translate-x-1/2" style={{ left: `${secondsToPercent(tick)}%` }}>{formatRulerTime(tick)}</span>)}</div>
+    <div
+      ref={timelineRef}
+      onClick={(event) => { if (didDragRef.current) { didDragRef.current = false; return; } onSeek(pixelsToSeconds(event.clientX)); }}
+      onMouseMove={(event) => setHoveredTime(pixelsToSeconds(event.clientX))}
+      onMouseLeave={() => setHoveredTime(null)}
+      className="absolute inset-x-0 top-6 bottom-0 bg-secondary/30 border border-secondary/50 cursor-pointer overflow-visible"
+    >
+      {hoveredTime !== null && (
+        <div
+          className="absolute top-0 bottom-0 z-20 w-px bg-foreground/70 pointer-events-none"
+          style={{ left: `${secondsToPercent(hoveredTime)}%` }}
+        >
+          <span className="absolute left-1/2 bottom-full mb-1 -translate-x-1/2 whitespace-nowrap rounded bg-popover px-2 py-1 text-xs font-mono text-popover-foreground shadow-md">
+            {secondsToTimecode(hoveredTime)}
+          </span>
+        </div>
+      )}
       {ticks.map((tick) => <div key={`grid-${tick}`} className="absolute top-0 bottom-0 border-l border-secondary/40" style={{ left: `${secondsToPercent(tick)}%` }} aria-hidden="true" />)}
       {allScenes.map((scene, index) => {
         const start = getSeconds(scene, 'start_timecode'); const end = getSeconds(scene, 'end_timecode'); if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
@@ -73,7 +90,7 @@ export const SceneTimeline = ({ duration, scenes, editStates, scenesToDelete, on
           <button type="button" title={label} aria-label={label} onClick={(event) => { event.stopPropagation(); onSeek(start); }} className={`absolute inset-0 w-full border ${colors.bg} ${colors.border} ${colors.hover} ${edited ? 'border-dashed' : ''} ${active ? 'ring-2 ring-red-400 ring-inset' : ''} transition-colors`} />
           <span className="absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-semibold text-white drop-shadow-md">{scene.scene_number}</span>
           {(['start', 'end'] as const).map((edge) => <button key={edge} type="button" title={`Adjust scene ${scene.scene_number} ${edge}`} aria-label={`Adjust scene ${scene.scene_number} ${edge} boundary`} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); onInitializeEditState(scene); didDragRef.current = false; setDragging({ sceneId: scene.id, edge }); }} onKeyDown={(event) => { if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); adjustBoundary(scene, edge, (event.key === 'ArrowRight' ? 1 : -1) * (event.shiftKey ? 1 : 0.01)); } }} className={`absolute ${edge === 'start' ? 'left-0' : 'right-0'} top-0 z-10 h-full w-2 ${colors.handle} cursor-ew-resize opacity-0 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-white`} />)}
-          {hoveredSceneId === scene.id && <span className="absolute left-1/2 bottom-full z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded bg-popover px-2 py-1 text-[10px] text-popover-foreground shadow-md pointer-events-none">{label}</span>}
+          {hoveredSceneId === scene.id && <span className="absolute left-1/2 bottom-full z-50 mb-1 -translate-x-1/2 whitespace-nowrap rounded bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md pointer-events-none">{label}</span>}
         </div>;
       })}
     </div>

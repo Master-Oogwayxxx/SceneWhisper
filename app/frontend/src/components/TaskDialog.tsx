@@ -473,7 +473,8 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 px-1 flex-1 overflow-y-auto flex flex-col scrollbar">
+        <div className="space-y-4 py-4 px-1 flex-1 overflow-y-auto flex flex-col scrollbar min-[1920px]:grid min-[1920px]:grid-cols-2 min-[1920px]:gap-x-8 min-[1920px]:space-y-0">
+          <div className="space-y-4 min-[1920px]:min-w-0">
           {
             selectedFiles.length > 0 && (
               <div className="space-y-2 max-h-48 overflow-y-auto scrollbar px-1">
@@ -514,6 +515,10 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
               </div>
             </div>
           )}
+
+          </div>
+
+          <div className="space-y-4 min-[1920px]:min-w-0">
 
           {/* Task Type */}
           <div className="space-y-2 py-2">
@@ -688,6 +693,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
               />
             </div>
           )}
+          </div>
         </div>
 
         <div className="flex gap-3 pt-2">

@@ -9,7 +9,7 @@ import { sceneApi } from '@/api/scenes';
 import { apiUrl } from '@/api/client';
 import { timecodeToSeconds, secondsToTimecode, isValidTimecode } from '@/lib/timecode';
 import { copyTextToClipboard } from '@/lib/utils';
-import { Check, Copy, Crosshair, Loader2, Maximize2, Minimize2, Play, RotateCcw, Trash2 } from 'lucide-react';
+import { Check, Copy, Crosshair, Loader2, Maximize2, Minimize2, Play, RotateCcw, Scissors, Trash2 } from 'lucide-react';
 import { SceneTimeline } from './SceneTimeline';
 import { MediaPlayer, MediaProvider, useMediaStore, isVideoProvider, type MediaPlayerInstance, type MediaProviderAdapter } from '@vidstack/react';
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
@@ -118,6 +118,7 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
   const seekTimerRef = useRef<number | null>(null);
   const pendingSeekSecondsRef = useRef<number | null>(null);
   const [videoReloadKey, setVideoReloadKey] = useState(0);
+  const closeAfterSaveRef = useRef(false);
   const [isFullscreen, setIsFullscreen] = useState(() => shouldUseFullscreenByDefault());
   const { currentTime, duration: rawVideoDuration } = useMediaStore(playerRef);
   const videoSource = useMemo(() => {
@@ -203,6 +204,10 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
       queryClient.invalidateQueries({ queryKey: ['scenes', file?.id] });
       setEditStates({});
       setScenesToDelete(new Set());
+      if (closeAfterSaveRef.current) {
+        closeAfterSaveRef.current = false;
+        onClose();
+      }
     },
   });
 
@@ -254,12 +259,19 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
 
     event.preventDefault();
     event.stopPropagation();
-    seekToSeconds(currentTime + (event.key === 'ArrowLeft' ? -1 : 1));
+    const step = event.ctrlKey && event.key === 'ArrowRight'
+      ? 0.1
+      : event.key === 'ArrowLeft' ? -1 : 1;
+    seekToSeconds(currentTime + step);
   }, [currentTime, seekToSeconds]);
 
   const handleSeekToTimecode = (timecode: string) => {
     if (!isValidTimecode(timecode)) return;
     seekToSeconds(timecodeToSeconds(timecode));
+  };
+
+  const shiftMarker = (delta: number) => {
+    seekToSeconds(currentTime + delta);
   };
 
   useEffect(() => {
@@ -429,6 +441,28 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
     });
   };
 
+  const handleSplitScene = (displayScene: DisplayScene) => {
+    const markerSeconds = currentTime;
+    if (!Number.isFinite(markerSeconds)) return;
+
+    const startSeconds = displayScene.start;
+    const endSeconds = displayScene.end;
+    if (!Number.isFinite(startSeconds) || !Number.isFinite(endSeconds) || markerSeconds <= startSeconds || markerSeconds >= endSeconds) {
+      return;
+    }
+
+    const startTimecode = secondsToTimecode(startSeconds);
+    const markerTimecode = secondsToTimecode(markerSeconds);
+    const endTimecode = secondsToTimecode(endSeconds);
+    const newSceneId = `new-${Date.now()}`;
+
+    setEditStates(prev => ({
+      ...prev,
+      [displayScene.id]: { start_timecode: startTimecode, end_timecode: markerTimecode },
+      [newSceneId]: { start_timecode: markerTimecode, end_timecode: endTimecode },
+    }));
+  };
+
   const saveAllEdits = () => {
     const updates: Array<{ id: string; start: string; end: string }> = [];
     const creates: Array<{ start: string; end: string }> = [];
@@ -447,6 +481,18 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
     if ((updates.length > 0 || creates.length > 0 || deletes.length > 0) && (updates.length + creates.length) === Object.keys(editStates).length) {
       updateMutation.mutate({ updates, creates, deletes });
     }
+  };
+
+  const saveAndClose = () => {
+    const hasChanges = Object.keys(editStates).length > 0 || scenesToDelete.size > 0;
+    if (!hasChanges) {
+      resetAll();
+      onClose();
+      return;
+    }
+
+    closeAfterSaveRef.current = true;
+    saveAllEdits();
   };
 
   const resetAll = () => {
@@ -737,6 +783,17 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
                 : '-'}
             </span>
             <div className="flex gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
+                onClick={() => handleSplitScene(displayScene)}
+                disabled={!Number.isFinite(currentTime) || currentTime <= displayScene.start || currentTime >= displayScene.end}
+                aria-label="Split scene at marker"
+                title="Split scene at marker"
+              >
+                <Scissors className="h-3 w-3" />
+              </Button>
               <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleDeleteNewScene(id)} aria-label="Delete new scene">
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -846,6 +903,17 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
               : formatDuration(scene.duration_seconds)}
           </span>
           <div className="flex gap-0.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
+                onClick={() => handleSplitScene(displayScene)}
+                disabled={!Number.isFinite(currentTime) || currentTime <= displayScene.start || currentTime >= displayScene.end || scenesToDelete.has(scene.id)}
+                aria-label="Split scene at marker"
+                title="Split scene at marker"
+              >
+                <Scissors className="h-3 w-3" />
+              </Button>
             <Button variant="ghost" size="icon" className={`h-5 w-5 ${scenesToDelete.has(scene.id) ? 'text-destructive' : ''}`} onClick={() => handleToggleSceneDeletion(scene.id)} aria-label="Mark scene for deletion">
               <Trash2 className="h-3 w-3" />
             </Button>
@@ -904,20 +972,34 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
             : "flex flex-col gap-4 flex-1 min-h-0 overflow-hidden"
           }>
             {file && (
-              <div className={`${isFullscreen ? 'w-3/5' : 'w-full max-w-2xl mx-auto'} shrink-0 bg-black rounded-md overflow-hidden aspect-video relative ${isFullscreen ? 'flex items-center self-center' : 'self-start'}`}>
-                <MediaPlayer
-                  key={`${file.id}-${isOpen ? 'open' : 'closed'}-${videoReloadKey}`}
-                  ref={playerRef}
-                  src={videoSource}
-                  className="w-full h-full"
-                  load="eager"
-                  muted
-                  onKeyDownCapture={handlePlayerKeyDown}
-                  onProviderSetup={handleProviderSetup}
-                >
-                  <MediaProvider />
-                  <DefaultVideoLayout icons={defaultLayoutIcons} seekStep={5} />
-                </MediaPlayer>
+              <div className={`${isFullscreen ? 'w-3/5' : 'w-full max-w-2xl mx-auto'} shrink-0 ${isFullscreen ? 'self-center' : 'self-start'}`}>
+                <div className="bg-black rounded-md overflow-hidden aspect-video relative">
+                  <MediaPlayer
+                    key={`${file.id}-${isOpen ? 'open' : 'closed'}-${videoReloadKey}`}
+                    ref={playerRef}
+                    src={videoSource}
+                    className="w-full h-full"
+                    load="eager"
+                    muted
+                    onKeyDownCapture={handlePlayerKeyDown}
+                    onProviderSetup={handleProviderSetup}
+                  >
+                    <MediaProvider />
+                    <DefaultVideoLayout icons={defaultLayoutIcons} seekStep={5} />
+                  </MediaPlayer>
+                </div>
+                <div className="flex items-center justify-center gap-1 pt-2" aria-label="Shift marker">
+                  {[-5, -1, -0.1].map((delta) => (
+                    <Button key={delta} variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => shiftMarker(delta)}>
+                      −{Math.abs(delta) < 1 ? `${Math.abs(delta) * 1000} ms` : `${Math.abs(delta)} s`}
+                    </Button>
+                  ))}
+                  { [0.1, 1, 5].map((delta) => (
+                    <Button key={delta} variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => shiftMarker(delta)}>
+                      +{delta < 1 ? `${delta * 1000} ms` : `${delta} s`}
+                    </Button>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -1004,6 +1086,24 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
                       </>
                     ) : (
                       'Save'
+                    )}
+                  </Button>
+                  <Button
+                    onClick={saveAndClose}
+                    disabled={
+                      updateMutation.isPending ||
+                      deleteMutation.isPending ||
+                      !Object.values(editStates).every(state => isValidTimecode(state.start_timecode) && isValidTimecode(state.end_timecode) && isValidTimeRange(state.start_timecode, state.end_timecode)) ||
+                      hasOverlappingScenes(scenes, editStates, scenesToDelete)
+                    }
+                  >
+                    {updateMutation.isPending && closeAfterSaveRef.current ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save and Close'
                     )}
                   </Button>
                 </div>

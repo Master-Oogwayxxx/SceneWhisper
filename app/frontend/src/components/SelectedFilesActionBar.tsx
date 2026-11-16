@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, Plus, Trash2, Scissors, Ban, CircleCheck, X, Tag } from 'lucide-react';
+import { ExternalLink, Plus, Trash2, Scissors, Ban, CircleCheck, X, Tag, GitMerge } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -100,6 +100,7 @@ interface SelectedFilesActionBarProps {
     layoutMode: FileLayoutMode;
     singleSelectedFile: File | null;
     setIsDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    onMergeFiles: () => void;
     openFileMoveDialog: (file: File) => void;
     splitDisableableSelectedFiles: File[];
     subtitleDisableableSelectedFiles: File[];
@@ -120,6 +121,7 @@ export function SelectedFilesActionBar({
     layoutMode,
     singleSelectedFile,
     setIsDialogOpen,
+    onMergeFiles,
     openFileMoveDialog,
     splitDisableableSelectedFiles,
     subtitleDisableableSelectedFiles,
@@ -285,6 +287,17 @@ export function SelectedFilesActionBar({
                     <Plus className="h-3.5 w-3.5" />
                     New Task
                 </Button>
+                {selectedFiles.length >= 2 && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={onMergeFiles}
+                    >
+                        <GitMerge className="h-3.5 w-3.5" />
+                        Merge
+                    </Button>
+                )}
                 {layoutMode === 'tree' && (
                     <Button
                         variant="outline"

@@ -65,7 +65,7 @@ export function FileTasksDialog({ file, open, onOpenChange }: FileTasksDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[90vw] max-w-[90vw] max-h-[95vh] flex flex-col">
+      <DialogContent className="w-[95vw] max-w-[95vw] max-h-[95vh] flex flex-col">
 
         <DialogHeader className="shrink-0">
           <DialogTitle>Tasks — {file.name}</DialogTitle>
@@ -90,7 +90,7 @@ export function FileTasksDialog({ file, open, onOpenChange }: FileTasksDialogPro
           )}
 
           {!isLoading && !error && tasks.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-2 min-[1920px]:grid min-[1920px]:grid-cols-3 min-[1920px]:gap-2 min-[1920px]:space-y-0">
               {tasks.map((task) => (
                 <TaskCard key={task.id} task={task} compact onUnpauseTask={handleUnpause} onDeleteTask={handleDeleteTask} />
               ))}

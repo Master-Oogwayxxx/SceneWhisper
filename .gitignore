@@ -212,3 +212,6 @@ cython_debug/
 AGENTS.md
 
 videos/
+
+# Runtime database files
+app/backend/data/*.db*

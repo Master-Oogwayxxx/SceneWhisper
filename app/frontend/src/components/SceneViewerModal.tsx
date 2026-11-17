@@ -463,6 +463,10 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
     }));
   };
 
+  const getSceneAtMarker = () => getDisplayScenes().find(scene => (
+    Number.isFinite(currentTime) && currentTime > scene.start && currentTime < scene.end
+  ));
+
   const saveAllEdits = () => {
     const updates: Array<{ id: string; start: string; end: string }> = [];
     const creates: Array<{ start: string; end: string }> = [];
@@ -783,17 +787,6 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
                 : '-'}
             </span>
             <div className="flex gap-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5"
-                onClick={() => handleSplitScene(displayScene)}
-                disabled={!Number.isFinite(currentTime) || currentTime <= displayScene.start || currentTime >= displayScene.end}
-                aria-label="Split scene at marker"
-                title="Split scene at marker"
-              >
-                <Scissors className="h-3 w-3" />
-              </Button>
               <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleDeleteNewScene(id)} aria-label="Delete new scene">
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -903,17 +896,6 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
               : formatDuration(scene.duration_seconds)}
           </span>
           <div className="flex gap-0.5">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5"
-                onClick={() => handleSplitScene(displayScene)}
-                disabled={!Number.isFinite(currentTime) || currentTime <= displayScene.start || currentTime >= displayScene.end || scenesToDelete.has(scene.id)}
-                aria-label="Split scene at marker"
-                title="Split scene at marker"
-              >
-                <Scissors className="h-3 w-3" />
-              </Button>
             <Button variant="ghost" size="icon" className={`h-5 w-5 ${scenesToDelete.has(scene.id) ? 'text-destructive' : ''}`} onClick={() => handleToggleSceneDeletion(scene.id)} aria-label="Mark scene for deletion">
               <Trash2 className="h-3 w-3" />
             </Button>
@@ -1057,6 +1039,17 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
                     disabled={!file}
                   >
                     Add Scene
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const scene = getSceneAtMarker();
+                      if (scene) handleSplitScene(scene);
+                    }}
+                    disabled={!getSceneAtMarker()}
+                  >
+                    <Scissors className="h-4 w-4 mr-2" />
+                    Split Scene
                   </Button>
                 </div>
                 <div className="flex gap-2">

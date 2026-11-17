@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Scissors, Subtitles, ScanSearch, Calendar, Clock, Globe, X, ChevronRight, ChevronDown, Folder, FileText, Sliders, Wand2, RefreshCcw, Shuffle, SearchCheck } from 'lucide-react';
+import { Scissors, Subtitles, ScanSearch, Calendar, Clock, Globe, X, ChevronRight, ChevronDown, Folder, FileText, Sliders, Wand2, RefreshCcw, Shuffle, SearchCheck, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -363,6 +363,10 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
     }
   };
 
+  const handleRemoveSelectedFile = (fileId: string) => {
+    setLocalFiles(prev => prev.filter(file => file.id !== fileId));
+  };
+
   const handleToggleExpand = (directoryId: string) => {
     setExpandedDirectories(prev => {
       const newSet = new Set(prev);
@@ -445,7 +449,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={`bg-card border-border max-w-2xl ${selectedFiles.length !== 1 ? "h-[95vh]" : ""} max-h-[95vh] overflow-y-auto flex flex-col`}>
+      <DialogContent className={`bg-card border-border max-w-4xl ${selectedFiles.length !== 1 ? "h-[95vh]" : ""} max-h-[95vh] overflow-y-auto flex flex-col`}>
         {taskType === 'scene' && sceneWarningMessage && (
           <DialogWarning className="whitespace-pre-line" message={sceneWarningMessage} />
         )}
@@ -474,20 +478,31 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
         </DialogHeader>
 
         <div className="space-y-4 py-4 px-1 flex-1 overflow-y-auto flex flex-col scrollbar min-[1920px]:grid min-[1920px]:grid-cols-2 min-[1920px]:gap-x-8 min-[1920px]:space-y-0">
-          <div className="space-y-4 min-[1920px]:min-w-0">
+          <div className="space-y-4 min-[1280px]:min-w-0 min-[1280px]:flex min-[1280px]:h-full min-[1280px]:min-h-0 min-[1280px]:flex-col">
           {
-            selectedFiles.length > 0 && (
-              <div className="space-y-2 max-h-48 overflow-y-auto scrollbar px-1">
-                {selectedFiles.map((file) => (
+            localFiles.length > 0 && (
+              <div className="space-y-2 min-h-0 overflow-y-auto scrollbar px-1 min-[1280px]:flex-1">
+                {localFiles.map((file) => (
                   <div key={file.id} className="border rounded-lg p-3 bg-secondary/50" data-testid="selected-file-display">
                     <div className="flex items-center gap-4">
                       <FileText className="w-4 h-4 text-muted-foreground" />
-                      <div className="mt-1">
+                      <div className="mt-1 min-w-0 flex-1">
                         <p className="text-sm">{file.name}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {formatFileSize(file.size)} • {file.path}
                         </p>
                       </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleRemoveSelectedFile(file.id)}
+                        title={`Remove ${file.name}`}
+                        aria-label={`Remove ${file.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -518,7 +533,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
 
           </div>
 
-          <div className="space-y-4 min-[1920px]:min-w-0">
+          <div className="space-y-4 min-[1920px]:min-w-0 min-[1920px]:min-h-0 min-[1920px]:overflow-y-auto min-[1920px]:scrollbar min-[1920px]:pr-2">
 
           {/* Task Type */}
           <div className="space-y-2 py-2">
@@ -528,7 +543,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
             </Label>
             <TooltipProvider>
               <RadioGroup value={taskType ?? ''} onValueChange={(v) => setTaskType(v as TaskDialogTaskType)}>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 min-[1280px]:grid-cols-2">
                   {[
                     { value: 'scene', label: 'Scene', icon: ScanSearch, tooltip: 'Detect scenes in video' },
                     { value: 'split', label: 'Split', icon: Scissors, tooltip: 'Split video into scenes' },

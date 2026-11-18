@@ -9,7 +9,7 @@ import { sceneApi } from '@/api/scenes';
 import { apiUrl } from '@/api/client';
 import { timecodeToSeconds, secondsToTimecode, isValidTimecode } from '@/lib/timecode';
 import { copyTextToClipboard } from '@/lib/utils';
-import { Check, Copy, Crosshair, Loader2, Maximize2, Minimize2, Play, RotateCcw, Scissors, Trash2 } from 'lucide-react';
+import { ArrowLeftRight, Check, Copy, Crosshair, Loader2, Maximize2, Minimize2, Play, RotateCcw, Scissors, Trash2 } from 'lucide-react';
 import { SceneTimeline } from './SceneTimeline';
 import { MediaPlayer, MediaProvider, useMediaStore, isVideoProvider, type MediaPlayerInstance, type MediaProviderAdapter } from '@vidstack/react';
 import { DefaultVideoLayout, defaultLayoutIcons } from '@vidstack/react/player/layouts/default';
@@ -463,10 +463,6 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
     }));
   };
 
-  const getSceneAtMarker = () => getDisplayScenes().find(scene => (
-    Number.isFinite(currentTime) && currentTime > scene.start && currentTime < scene.end
-  ));
-
   const saveAllEdits = () => {
     const updates: Array<{ id: string; start: string; end: string }> = [];
     const creates: Array<{ start: string; end: string }> = [];
@@ -618,10 +614,28 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
     setEditStates(current => extendPrecedingSceneIntoDeletedRange(sceneId, next, current));
   };
 
+  const handleDeleteSceneOnly = (sceneId: string) => {
+    const next = new Set(scenesToDelete);
+    if (next.has(sceneId)) {
+      next.delete(sceneId);
+    } else {
+      next.add(sceneId);
+    }
+    setScenesToDelete(next);
+  };
+
   const handleDeleteNewScene = (sceneId: string) => {
     setEditStates(prev => {
       const expandedState = extendPrecedingSceneIntoDeletedRange(sceneId, scenesToDelete, prev);
       const nextState = { ...expandedState };
+      delete nextState[sceneId];
+      return nextState;
+    });
+  };
+
+  const handleRemoveNewScene = (sceneId: string) => {
+    setEditStates(prev => {
+      const nextState = { ...prev };
       delete nextState[sceneId];
       return nextState;
     });
@@ -711,7 +725,7 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
 
       return (
         <div key={id} className="space-y-1">
-          <div className="grid grid-cols-[2rem_minmax(7rem,1fr)_2rem_2rem_2rem_minmax(7rem,1fr)_2rem_2rem_2rem_1fr_3rem] gap-2 px-2 py-1.5 text-sm rounded transition-colors items-center bg-primary/10">
+          <div className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_1.5rem_1.5rem_1.5rem_minmax(0,1fr)_1.5rem_1.5rem_1.5rem_minmax(0,1fr)_5rem] gap-2 px-2 py-1.5 text-sm rounded transition-colors items-center bg-primary/10">
             <span className="text-muted-foreground font-semibold">{displayScene.number}</span>
             <Input
               className="w-full min-w-0 h-6 text-sm font-mono px-1"
@@ -786,8 +800,29 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
                 ? formatDuration(calculateDuration(editState.start_timecode, editState.end_timecode))
                 : '-'}
             </span>
-            <div className="flex gap-0.5">
-              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleDeleteNewScene(id)} aria-label="Delete new scene">
+            <div className="flex min-w-0 flex-wrap justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
+                onClick={() => handleSplitScene(displayScene)}
+                disabled={!Number.isFinite(currentTime) || currentTime <= displayScene.start || currentTime >= displayScene.end}
+                aria-label="Split scene at marker"
+                title="Split scene at marker"
+              >
+                <Scissors className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
+                onClick={() => handleDeleteNewScene(id)}
+                aria-label="Delete new scene and extend the previous scene"
+                title="Delete new scene and extend the previous scene"
+              >
+                <ArrowLeftRight className="h-3 w-3" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleRemoveNewScene(id)} aria-label="Delete new scene" title="Delete new scene only">
                 <Trash2 className="h-3 w-3" />
               </Button>
             </div>
@@ -812,7 +847,7 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
 
     return (
       <div key={scene.id} className="space-y-1">
-        <div className={`grid grid-cols-[2rem_minmax(7rem,1fr)_2rem_2rem_2rem_minmax(7rem,1fr)_2rem_2rem_2rem_1fr_3rem] gap-2 px-2 py-1.5 text-sm rounded transition-colors items-center ${isModified ? 'bg-primary/5' : 'hover:bg-secondary/50'}`}>
+        <div className={`grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_1.5rem_1.5rem_1.5rem_minmax(0,1fr)_1.5rem_1.5rem_1.5rem_minmax(0,1fr)_5rem] gap-2 px-2 py-1.5 text-sm rounded transition-colors items-center ${isModified ? 'bg-primary/5' : 'hover:bg-secondary/50'}`}>
           <span className="text-muted-foreground">{displayScene.number}</span>
           <Input
             className="w-full min-w-0 h-6 text-sm font-mono px-1"
@@ -895,8 +930,29 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
               ? formatDuration(calculateDuration(currentEdit.start_timecode, currentEdit.end_timecode))
               : formatDuration(scene.duration_seconds)}
           </span>
-          <div className="flex gap-0.5">
-            <Button variant="ghost" size="icon" className={`h-5 w-5 ${scenesToDelete.has(scene.id) ? 'text-destructive' : ''}`} onClick={() => handleToggleSceneDeletion(scene.id)} aria-label="Mark scene for deletion">
+          <div className="flex min-w-0 flex-wrap justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5"
+              onClick={() => handleSplitScene(displayScene)}
+              disabled={!Number.isFinite(currentTime) || currentTime <= displayScene.start || currentTime >= displayScene.end || scenesToDelete.has(scene.id)}
+              aria-label="Split scene at marker"
+              title="Split scene at marker"
+            >
+              <Scissors className="h-3 w-3" />
+            </Button>
+            <Button variant="ghost" size="icon" className={`h-5 w-5 ${scenesToDelete.has(scene.id) ? 'text-destructive' : ''}`} onClick={() => handleToggleSceneDeletion(scene.id)} aria-label="Mark scene for deletion" title="Delete scene and extend the previous scene">
+              <ArrowLeftRight className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={`h-5 w-5 ${scenesToDelete.has(scene.id) ? 'text-destructive' : ''}`}
+              onClick={() => handleDeleteSceneOnly(scene.id)}
+              aria-label="Delete scene only"
+              title="Delete scene only (preserve neighboring scene ranges)"
+            >
               <Trash2 className="h-3 w-3" />
             </Button>
           </div>
@@ -985,7 +1041,7 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
               </div>
             )}
 
-            <div className="flex-1 min-h-0 flex flex-col overflow-y-auto scrollbar">
+            <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-y-auto scrollbar">
               {isLoading && (
                 <div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1002,8 +1058,8 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
               )}
 
               {(scenes && scenes.length > 0) || Object.keys(editStates).some(id => id.startsWith('new-')) ? (
-                <div className="space-y-1 flex-1 overflow-y-auto scrollbar">
-                  <div className="grid grid-cols-[2rem_minmax(7rem,1fr)_2rem_2rem_2rem_minmax(7rem,1fr)_2rem_2rem_2rem_1fr_3rem] gap-2 px-2 py-1 text-xs font-medium text-muted-foreground border-b">
+                <div className="space-y-1 flex-1 min-w-0 overflow-y-auto scrollbar">
+                  <div className="grid min-w-0 grid-cols-[1.5rem_minmax(0,1fr)_1.5rem_1.5rem_1.5rem_minmax(0,1fr)_1.5rem_1.5rem_1.5rem_minmax(0,1fr)_5rem] gap-2 px-2 py-1 text-xs font-medium text-muted-foreground border-b">
                     <span>#</span>
                     <span>Start</span>
                     <span />
@@ -1039,17 +1095,6 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
                     disabled={!file}
                   >
                     Add Scene
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const scene = getSceneAtMarker();
-                      if (scene) handleSplitScene(scene);
-                    }}
-                    disabled={!getSceneAtMarker()}
-                  >
-                    <Scissors className="h-4 w-4 mr-2" />
-                    Split Scene
                   </Button>
                 </div>
                 <div className="flex gap-2">

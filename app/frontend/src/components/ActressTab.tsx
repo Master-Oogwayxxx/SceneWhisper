@@ -240,6 +240,7 @@ export function R18AutoRefreshSection({ settings, onPatch }: R18AutoRefreshSecti
 export const ActressTab = () => {
   const selectedActressQueryKey = 'actress'
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { settings, patchSettings } = useSettings()
   const [searchDraft, setSearchDraft] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [page, setPage] = useState(() => {
@@ -330,7 +331,6 @@ export const ActressTab = () => {
     worksFilter,
   )
   const { importFile, importLatest } = useR18ImportMutations()
-  const { settings, patchSettings } = useSettings()
   const queryClient = useQueryClient()
   const showCovers = settings.show_actress_work_covers
   const showTitles = settings.show_actress_work_titles ?? true

@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { RefreshCw, FileVideo, CheckCircle2, Layers } from 'lucide-react'
 import { useOverviewStats } from '@/hooks/useStats'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,22 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts'
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -62,6 +79,19 @@ function DistributionBar({
       <div className="h-2 bg-muted rounded-full overflow-hidden">
         <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
       </div>
+    </div>
+  )
+}
+
+const CHART_COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7', '#ec4899']
+const HISTORY_KEY = 'scene-whisper-stats-history'
+type HistoryPoint = { date: string; files: number; storage: number; completed: number; failed: number; queued: number }
+
+function ChartCard({ title, children, className = '' }: { title: string; children: ReactNode; className?: string }) {
+  return (
+    <div className={cn('rounded-lg border border-border bg-card p-4', className)}>
+      <h3 className="mb-4 text-xs font-semibold tracking-wide text-muted-foreground">{title}</h3>
+      <div className="h-64">{children}</div>
     </div>
   )
 }
@@ -135,7 +165,35 @@ function LoadingSkeleton() {
 export function StatsTab() {
   const { data, isLoading, isFetching, error } = useOverviewStats()
   const [isRefreshSpinning, setIsRefreshSpinning] = useState(false)
+  const [history, setHistory] = useState<HistoryPoint[]>([])
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') as HistoryPoint[]
+      setHistory(saved.filter((point) => Date.now() - new Date(point.date).getTime() <= 90 * 86400000))
+    } catch {
+      setHistory([])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!data) return
+    const today = new Date().toISOString().slice(0, 10)
+    const point: HistoryPoint = {
+      date: today,
+      files: data.coverage.total_files,
+      storage: data.storage.total_bytes,
+      completed: data.processing.completed,
+      failed: data.processing.failed,
+      queued: data.processing.queued,
+    }
+    setHistory((current) => {
+      const next = [...current.filter((item) => item.date !== today), point].slice(-90)
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [data])
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshSpinning(true)
@@ -145,6 +203,21 @@ export function StatsTab() {
       window.setTimeout(() => setIsRefreshSpinning(false), 600)
     }
   }, [queryClient])
+
+  const historyChartData = useMemo(() => {
+    if (history.length < 2) return history
+    const first = history[0]
+    const last = history[history.length - 1]
+    const days = Math.max(1, (new Date(last.date).getTime() - new Date(first.date).getTime()) / 86400000)
+    return [...history, {
+      date: '30d forecast',
+      files: Math.max(0, Math.round(last.files + ((last.files - first.files) / days) * 30)),
+      storage: Math.max(0, Math.round(last.storage + ((last.storage - first.storage) / days) * 30)),
+      completed: last.completed,
+      failed: last.failed,
+      queued: last.queued,
+    }]
+  }, [history])
 
   if (isLoading) return <LoadingSkeleton />
 
@@ -162,6 +235,29 @@ export function StatsTab() {
   if (!data) return null
 
   const { processing, coverage, storage, scenes, directories } = data
+  const statusData = [
+    { name: 'Queued', value: processing.queued },
+    { name: 'Processing', value: processing.processing },
+    { name: 'Completed', value: processing.completed },
+    { name: 'Failed', value: processing.failed },
+    { name: 'Cancelled', value: processing.cancelled },
+  ].filter((item) => item.value > 0)
+  const taskTypeData = Object.entries(processing.by_type)
+    .filter(([, value]) => (value ?? 0) > 0)
+    .map(([name, value]) => ({ name: name.replace(/_/g, ' '), value: value ?? 0 }))
+  const formatData = Object.entries(storage.by_format)
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, value]) => ({ name: name.toUpperCase(), value }))
+  const codecData = Object.entries(storage.by_codec)
+    .sort(([, a], [, b]) => b - a)
+    .map(([name, value]) => ({ name: name.toUpperCase(), value }))
+  const resolutionData = [
+    { name: '4K', value: storage.res_4k },
+    { name: '1080p', value: storage.res_1080p },
+    { name: '720p', value: storage.res_720p },
+    { name: 'SD', value: storage.res_sd },
+  ]
+  const directoryData = directories.top_directories.map((dir) => ({ name: dir.name, files: dir.file_count }))
 
   return (
     <div className="flex-1 overflow-auto scrollbar">
@@ -174,18 +270,105 @@ export function StatsTab() {
           </Button>
         </div>
 
-        {/* KPI Hero Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Files" value={coverage.total_files} icon={FileVideo} />
-          <MetricCard label="Total Storage" value={formatBytes(storage.total_bytes)} />
-          <StatCard label="Completed Tasks" value={processing.completed} icon={CheckCircle2} variant="success" />
-          <StatCard label="Total Scenes" value={scenes.total_scenes} icon={Layers} />
-        </div>
+        <Tabs defaultValue="overview" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="processing">Processing</TabsTrigger>
+            <TabsTrigger value="library">Library</TabsTrigger>
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+          </TabsList>
 
-        <Separator />
+          <TabsContent value="overview" className="mt-0 space-y-4">
+            {/* KPI Hero Row */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <StatCard label="Total Files" value={coverage.total_files} icon={FileVideo} />
+              <MetricCard label="Total Storage" value={formatBytes(storage.total_bytes)} />
+              <StatCard label="Completed Tasks" value={processing.completed} icon={CheckCircle2} variant="success" />
+              <StatCard label="Total Scenes" value={scenes.total_scenes} icon={Layers} />
+            </div>
+            <h2 className="font-semibold uppercase tracking-wide text-muted-foreground">Overview</h2>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <ChartCard title="PROCESSING STATUS">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={statusData} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="80%" paddingAngle={2}>
+                    {statusData.map((entry, index) => <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+            <ChartCard title="TASK TYPES">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={taskTypeData} margin={{ left: 8, right: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} tickFormatter={(value) => value.slice(0, 10)} />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Tasks" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+            <ChartCard title="LIBRARY COVERAGE">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={[{ name: 'Scenes', value: coverage.with_scenes }, { name: 'Split', value: coverage.with_split }, { name: 'Subtitles', value: coverage.with_subtitle }]} margin={{ left: 8, right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Files" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+            <ChartCard title="RESOLUTION DISTRIBUTION">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={resolutionData} margin={{ left: 8, right: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Files" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+            <ChartCard title="FILE FORMATS">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={formatData} dataKey="value" nameKey="name" innerRadius="45%" outerRadius="75%">
+                    {formatData.map((entry, index) => <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip /><Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+            <ChartCard title="CODECS">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={codecData} dataKey="value" nameKey="name" innerRadius="45%" outerRadius="75%">
+                    {codecData.map((entry, index) => <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip /><Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartCard>
+            <ChartCard title="TOP DIRECTORIES" className="lg:col-span-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={directoryData} layout="vertical" margin={{ left: 24, right: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="files" name="Files" fill="#a855f7" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartCard>
+          </div>
+          </TabsContent>
 
         {/* Processing Section */}
-        <div className="space-y-4">
+        <TabsContent value="processing" className="mt-0 space-y-4">
           <h2 className="font-semibold text-muted-foreground uppercase tracking-wide">Processing</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -221,12 +404,10 @@ export function StatsTab() {
               <MetricCard label="Splits Generated" value={processing.total_splits_generated} />
             </div>
           </div>
-        </div>
-
-        <Separator />
+        </TabsContent>
 
         {/* Library Section */}
-        <div className="space-y-4">
+        <TabsContent value="library" className="mt-0 space-y-4">
           <h2 className="font-semibold text-muted-foreground uppercase tracking-wide">Library</h2>
 
           {/* Coverage */}
@@ -295,12 +476,10 @@ export function StatsTab() {
               />
             </div>
           </div>
-        </div>
-
-        <Separator />
+        </TabsContent>
 
         {/* Content Analysis Section */}
-        <div className="space-y-4">
+        <TabsContent value="content" className="mt-0 space-y-4">
           <h2 className="font-semibold text-muted-foreground uppercase tracking-wide">Content Analysis</h2>
 
           {/* Scene Stats */}
@@ -350,7 +529,55 @@ export function StatsTab() {
               </div>
             )}
           </div>
-        </div>
+        </TabsContent>
+        <TabsContent value="history" className="mt-0 space-y-4">
+          <div>
+            <h2 className="font-semibold uppercase tracking-wide text-muted-foreground">History & Projections</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Daily snapshots are retained locally for 90 days. Forecasts extrapolate the observed trend over the next 30 days.</p>
+          </div>
+          {history.length < 2 ? (
+            <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">Collecting history. Return tomorrow to see trend and projection charts.</div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <ChartCard title="FILE COUNT (30-DAY FORECAST)">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={historyChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip /><Legend />
+                    <Line type="monotone" dataKey="files" name="Files" stroke="#6366f1" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartCard>
+              <ChartCard title="STORAGE (30-DAY FORECAST)">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={historyChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                    <YAxis tickFormatter={(value) => formatBytes(value)} width={72} />
+                    <Tooltip formatter={(value) => formatBytes(Number(value))} /><Legend />
+                    <Line type="monotone" dataKey="storage" name="Storage" stroke="#22c55e" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartCard>
+              <ChartCard title="TASK THROUGHPUT">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={historyChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip /><Legend />
+                    <Line type="monotone" dataKey="completed" name="Completed" stroke="#22c55e" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="failed" name="Failed" stroke="#ef4444" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="queued" name="Queued" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartCard>
+            </div>
+          )}
+        </TabsContent>
+        </Tabs>
       </div>
     </div>
   )

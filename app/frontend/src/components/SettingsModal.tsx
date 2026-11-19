@@ -973,7 +973,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                       <div className="space-y-1">
                         <p className="text-xs font-medium sm:text-sm">Scheduled scan</p>
                         <p className="text-[11px] text-muted-foreground sm:text-xs">
-                          Automatically run the scan every day at the selected local time.
+                          Automatically run the scan at the selected period and local time.
                         </p>
                       </div>
                       <Switch
@@ -986,6 +986,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                           patchSettings({
                             scan_schedule_enabled: true,
                             scan_schedule_time: settings.scan_schedule_time ?? '09:00',
+                            scan_schedule_interval: settings.scan_schedule_interval ?? 'daily',
+                            scan_schedule_day_of_week: settings.scan_schedule_day_of_week ?? 0,
                             scan_schedule_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                           })
                         }}
@@ -993,6 +995,40 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     </div>
                     {settings.scan_schedule_enabled && (
                       <>
+                        <div className="space-y-2">
+                          <Label htmlFor="scan-schedule-interval" className="text-xs sm:text-sm">Period</Label>
+                          <Select
+                            value={settings.scan_schedule_interval ?? 'daily'}
+                            onValueChange={(value) => patchSettings({
+                              scan_schedule_interval: value === 'weekly' ? 'weekly' : 'daily',
+                              scan_schedule_day_of_week: value === 'weekly' ? (settings.scan_schedule_day_of_week ?? 0) : null,
+                            })}
+                          >
+                            <SelectTrigger id="scan-schedule-interval" className="h-8 text-xs sm:h-9 sm:text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="daily">Every day</SelectItem>
+                              <SelectItem value="weekly">Every week</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {settings.scan_schedule_interval === 'weekly' && (
+                          <div className="space-y-2">
+                            <Label htmlFor="scan-schedule-day" className="text-xs sm:text-sm">Day</Label>
+                            <Select
+                              value={String(settings.scan_schedule_day_of_week ?? 0)}
+                              onValueChange={(value) => patchSettings({ scan_schedule_day_of_week: Number(value) })}
+                            >
+                              <SelectTrigger id="scan-schedule-day" className="h-8 text-xs sm:h-9 sm:text-sm"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, index) => (
+                                  <SelectItem key={day} value={String(index)}>{day}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
                         <div className="space-y-2">
                           <Label htmlFor="scan-schedule-time" className="text-xs sm:text-sm">Run time</Label>
                           <Input
@@ -1178,6 +1214,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                       scan_schedule_enabled: false,
                       scan_schedule_time: null,
                       scan_schedule_time_zone: null,
+                      scan_schedule_interval: 'daily',
+                      scan_schedule_day_of_week: null,
                       scan_schedule_mode: 'all',
                       task_type_priority: ['all', 'merge', 'subtitle', 'split', 'scene', 'analyze_frame_pacing', 'nvenc_frame_pacing', 'remux'],
                       processing_hours_enabled: false,
@@ -1354,7 +1392,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         onCheckedChange={(v) => patchSettings({ show_actress_work_titles: v })}
                       />
                     </SettingRow>
-                    <div className="flex flex-col gap-2.5 py-2.5 sm:gap-3 sm:py-3">
+                    <div className="flex flex-col gap-2.5 border-t border-border py-2.5 sm:gap-3 sm:py-3">
                       <div>
                         <Label className="text-xs font-medium sm:text-sm">External video code links</Label>
                         <p className={compactHelpTextClass}>Use {'{videoCode}'} and optional {'{actress}'} in the URL template. The actress work card menu shows one action per valid row.</p>
@@ -1427,7 +1465,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2.5 py-2.5 sm:gap-3 sm:py-3">
+                    <div className="flex flex-col gap-2.5 border-t border-border py-2.5 sm:gap-3 sm:py-3">
                       <div>
                         <Label className="text-xs font-medium sm:text-sm">Metadata scraper templates</Label>
                         <p className={compactHelpTextClass}>Reusable field and selector configurations for actress metadata scraping. Configure new templates from the actress scraper dialog.</p>
@@ -1461,7 +1499,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         </Button>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2.5 py-2.5 sm:gap-3 sm:py-3">
+                    <div className="flex flex-col gap-2.5 border-t border-border py-2.5 sm:gap-3 sm:py-3">
                       <div>
                         <Label className="text-xs font-medium sm:text-sm">Scraper websites</Label>
                         <p className={compactHelpTextClass}>Add reusable actress-page URLs. Include {'{actress_name}'} where the entered actress name should go.</p>
@@ -1534,7 +1572,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         </div>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2.5 py-2.5 sm:gap-3 sm:py-3">
+                    <div className="flex flex-col gap-2.5 border-y border-border py-2.5 sm:gap-3 sm:py-3">
                       <div>
                         <Label className="text-xs font-medium sm:text-sm">qBittorrent</Label>
                         <p className={compactHelpTextClass}>Web UI credentials for sending torrents</p>
@@ -1697,11 +1735,11 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
                 {settings.scene_detector === 'threshold' && (
                   <>
-                    <SettingRow label={`Black threshold: ${settings.scene_black_threshold}`} description="Luminance floor for fade-to-black (0–255)">
+                    <SettingRow label={`Black threshold: ${settings.scene_black_threshold}`} description="Detect frames at or below this brightness as black; higher values are more sensitive (0–255)">
                       <Slider min={0} max={255} step={1} value={[settings.scene_black_threshold]}
                         onValueChange={([v]) => patchSettings({ scene_black_threshold: v })} className="w-28 sm:w-36" />
                     </SettingRow>
-                    <SettingRow label={`White threshold: ${settings.scene_white_threshold}`} description="Luminance ceiling for fade-to-white (0–255)">
+                    <SettingRow label={`White threshold: ${settings.scene_white_threshold}`} description="Detect frames at or above this brightness as white; lower values are more sensitive (0–255)">
                       <Slider min={0} max={255} step={1} value={[settings.scene_white_threshold]}
                         onValueChange={([v]) => patchSettings({ scene_white_threshold: v })} className="w-28 sm:w-36" />
                     </SettingRow>

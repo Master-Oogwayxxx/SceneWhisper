@@ -243,6 +243,8 @@ async def update_settings(body: dict[str, Any]):
             "scan_schedule_enabled",
             "scan_schedule_time",
             "scan_schedule_time_zone",
+            "scan_schedule_interval",
+            "scan_schedule_day_of_week",
             "scan_schedule_mode",
         )
     )
@@ -251,14 +253,27 @@ async def update_settings(body: dict[str, Any]):
         enabled = bool(encoded.get("scan_schedule_enabled", current.scan_schedule_enabled))
         time_value = encoded.get("scan_schedule_time", current.scan_schedule_time)
         time_zone = encoded.get("scan_schedule_time_zone", current.scan_schedule_time_zone)
+        interval_value = encoded.get("scan_schedule_interval", current.scan_schedule_interval)
+        day_value = encoded.get("scan_schedule_day_of_week", current.scan_schedule_day_of_week)
         mode_value = encoded.get("scan_schedule_mode", current.scan_schedule_mode)
+        if interval_value not in {"daily", "weekly"}:
+            interval_value = "daily"
+            encoded["scan_schedule_interval"] = interval_value
+        if interval_value == "weekly" and day_value not in range(7):
+            day_value = 0
+            encoded["scan_schedule_day_of_week"] = day_value
         if mode_value not in {"all", "selected"}:
             mode_value = "all"
             encoded["scan_schedule_mode"] = mode_value
         if enabled and time_value:
-            encoded["scan_schedule_next_run"] = utc_isoformat(
-                calculate_next_run({"interval": "daily", "time": time_value, "timeZone": time_zone})
-            )
+            schedule_payload = {
+                "interval": interval_value,
+                "time": time_value,
+                "timeZone": time_zone,
+            }
+            if interval_value == "weekly":
+                schedule_payload["dayOfWeek"] = day_value
+            encoded["scan_schedule_next_run"] = utc_isoformat(calculate_next_run(schedule_payload))
             encoded["scan_schedule_last_error"] = None
         elif not enabled:
             encoded["scan_schedule_next_run"] = None

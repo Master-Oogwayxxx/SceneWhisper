@@ -37,8 +37,9 @@ def _get_schedule_payload(settings) -> dict[str, object] | None:
     if not settings.scan_schedule_time:
         return None
     return {
-        "interval": "daily",
+        "interval": getattr(settings, "scan_schedule_interval", "daily"),
         "time": settings.scan_schedule_time,
+        "dayOfWeek": getattr(settings, "scan_schedule_day_of_week", None),
         "timeZone": getattr(settings, "scan_schedule_time_zone", None),
     }
 

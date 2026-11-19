@@ -58,6 +58,7 @@ class SettingRecord(Base):
     scan_schedule_enabled = Column(Boolean, nullable=False, default=False)
     scan_schedule_time = Column(String, nullable=True)
     scan_schedule_time_zone = Column(String, nullable=True)
+    scan_schedule_interval = Column(String, nullable=False, default="daily")
     scan_schedule_mode = Column(String, nullable=False, default="all")
     scan_schedule_day_of_week = Column(Integer, nullable=True)
     scan_schedule_last_run = Column(String, nullable=True)

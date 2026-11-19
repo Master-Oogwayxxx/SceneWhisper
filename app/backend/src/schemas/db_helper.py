@@ -443,6 +443,7 @@ def _ensure_scan_schedule_columns() -> None:
             ("scan_schedule_enabled", "BOOLEAN NOT NULL DEFAULT 0"),
             ("scan_schedule_time", "TEXT"),
             ("scan_schedule_time_zone", "TEXT"),
+            ("scan_schedule_interval", "TEXT NOT NULL DEFAULT 'daily'"),
             ("scan_schedule_mode", "TEXT NOT NULL DEFAULT 'all'"),
             ("scan_schedule_day_of_week", "INTEGER"),
             ("scan_schedule_last_run", "TEXT"),

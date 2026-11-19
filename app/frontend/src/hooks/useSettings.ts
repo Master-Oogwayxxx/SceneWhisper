@@ -74,6 +74,8 @@ const DEFAULTS: AppSettings = {
   scan_schedule_enabled: false,
   scan_schedule_time: null,
   scan_schedule_time_zone: null,
+  scan_schedule_interval: 'daily',
+  scan_schedule_day_of_week: null,
   scan_schedule_mode: 'all',
   scan_schedule_last_run: null,
   scan_schedule_next_run: null,

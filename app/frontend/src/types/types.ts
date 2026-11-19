@@ -496,6 +496,8 @@ export interface AppSettings {
   scan_schedule_enabled: boolean
   scan_schedule_time: string | null
   scan_schedule_time_zone: string | null
+  scan_schedule_interval: 'daily' | 'weekly'
+  scan_schedule_day_of_week: number | null
   scan_schedule_mode: 'all' | 'selected'
   scan_schedule_last_run: string | null
   scan_schedule_next_run: string | null

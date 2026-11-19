@@ -25,6 +25,7 @@ from ..crud.deleted_file import record_deleted_file
 from ..crud.setting import get_settings
 from ..models.models import BookmarkMatchedFile, BookmarkVideoCheckRequest, BookmarkVideoCheckResponse
 from ..schemas.db_helper import close_db, get_db
+from ..schemas.deleted_file import DeletedFileRecord
 from ..schemas.file import FileRecord
 from ..schemas.directory import DirectoryRecord
 from ..schemas.frame_pacing_analysis import FramePacingAnalysisRunRecord
@@ -1352,6 +1353,14 @@ def _bookmark_matched_files(db, codes: list[str], directory_ids: list[str] | Non
         query = query.filter(FileRecord.directory_id.in_(normalized_directory_ids))
     rows = query.order_by(FileRecord.name.asc()).all()
 
+    deleted_query = db.query(DeletedFileRecord).filter(
+        DeletedFileRecord.file_type == "video",
+        or_(*[DeletedFileRecord.name.ilike(f"%{code}%") for code in normalized_codes]),
+    )
+    if normalized_directory_ids:
+        deleted_query = deleted_query.filter(DeletedFileRecord.directory_id.in_(normalized_directory_ids))
+    deleted_rows = deleted_query.order_by(DeletedFileRecord.name.asc()).all()
+
     matches: dict[str, list[BookmarkMatchedFile]] = {code: [] for code in normalized_codes}
     for row in rows:
         name_lower = (row.name or "").lower()
@@ -1378,6 +1387,22 @@ def _bookmark_matched_files(db, codes: list[str], directory_ids: list[str] | Non
         for code in normalized_codes:
             if code.lower() in name_lower:
                 matches[code].append(matched_file)
+    for row in deleted_rows:
+        name_lower = (row.name or "").lower()
+        matched_file = BookmarkMatchedFile(
+            id=f"deleted-{row.id}",
+            name=row.name,
+            path=row.path,
+            size=row.size or 0,
+            created_at=row.original_created_at,
+            modified_at=row.original_modified_at,
+            format=row.format,
+            file_type=row.file_type,
+            is_deleted=True,
+        )
+        for code in normalized_codes:
+            if code.lower() in name_lower:
+                matches[code].append(matched_file)
     return matches
 
 
@@ -1394,7 +1419,10 @@ def _check_bookmark_video_codes(body: BookmarkVideoCheckRequest) -> BookmarkVide
             item.model_copy(
                 update={
                     "video_code": item.video_code.upper(),
-                    "file_exists": bool(matched_files_by_code.get(item.video_code.upper())),
+                    "file_exists": any(
+                        not matched_file.is_deleted
+                        for matched_file in matched_files_by_code.get(item.video_code.upper(), [])
+                    ),
                     "matched_files": matched_files_by_code.get(item.video_code.upper(), []),
                 }
             )

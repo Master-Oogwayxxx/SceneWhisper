@@ -62,8 +62,10 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase()
     return items.filter((item) => {
+      const isDeleted = item.matchedFiles.some((file) => file.is_deleted)
       if (hasChecked && status === 'exists' && !item.fileExists) return false
-      if (hasChecked && status === 'missing' && item.fileExists) return false
+      if (hasChecked && status === 'missing' && (item.fileExists || isDeleted)) return false
+      if (hasChecked && status === 'deleted' && !isDeleted) return false
       if (kind !== 'all' && getVideoContentKind(item.title) !== kind) return false
       if (!query) return true
       return (
@@ -75,10 +77,12 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
   }, [hasChecked, items, kind, search, status])
 
   const existingCount = items.filter((item) => item.fileExists).length
+  const deletedCount = items.filter((item) => item.matchedFiles.some((file) => file.is_deleted)).length
   const statusCounts = {
     all: items.length,
     exists: hasChecked ? existingCount : 0,
-    missing: hasChecked ? items.length - existingCount : 0,
+    missing: hasChecked ? items.length - existingCount - deletedCount : 0,
+    deleted: hasChecked ? deletedCount : 0,
   }
   const visibleRowIds = useMemo(() => filteredItems.map(pageRowId), [filteredItems])
   const visibleUnopenedRowIds = useMemo(
@@ -577,7 +581,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
                     <h3 className="mt-1 truncate text-sm font-medium" title={item.title}>{item.title}</h3>
                   </div>
                 </div>
-                {hasChecked ? <BookmarkStatusBadge exists={item.fileExists} /> : <span className="text-xs text-muted-foreground">Not checked</span>}
+                {hasChecked ? <BookmarkStatusBadge exists={item.fileExists} deleted={item.matchedFiles.some((file) => file.is_deleted)} /> : <span className="text-xs text-muted-foreground">Not checked</span>}
               </div>
               <div className="mt-3 break-all rounded-md bg-secondary/35 px-2 py-1.5 text-xs text-muted-foreground">{item.url}</div>
               <div className="mt-3 rounded-md border border-border/70 px-2 py-2">
@@ -642,7 +646,7 @@ export function HtmlPageVideoCheckTool({ onBack }: HtmlPageVideoCheckToolProps) 
                 <td className="min-w-0 px-3 py-2 align-middle">
                   {hasChecked ? <MatchedFilesSummary files={item.matchedFiles} /> : <span className="text-xs text-muted-foreground">Import page HTML and run check</span>}
                 </td>
-                <td className="px-3 py-2 align-middle">{hasChecked ? <BookmarkStatusBadge exists={item.fileExists} /> : <span className="text-xs text-muted-foreground">Not checked</span>}</td>
+                <td className="px-3 py-2 align-middle">{hasChecked ? <BookmarkStatusBadge exists={item.fileExists} deleted={item.matchedFiles.some((file) => file.is_deleted)} /> : <span className="text-xs text-muted-foreground">Not checked</span>}</td>
                 <td className="px-3 py-2 align-middle">
                   <OpenedVideoCodeBadge opened={openedRowIds.has(pageRowId(item))} />
                 </td>

@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@/components/ui/context-menu'
 
-export type StatusFilter = 'all' | 'exists' | 'missing'
+export type StatusFilter = 'all' | 'exists' | 'missing' | 'deleted'
 
 export interface ParsedGoogleBookmarks {
   items: BookmarkVideoCheckItem[]
@@ -171,7 +171,8 @@ function parentDirectoryName(path: string) {
   return parts.length > 1 ? parts[parts.length - 2] : path
 }
 
-export function BookmarkStatusBadge({ exists }: { exists: boolean }) {
+export function BookmarkStatusBadge({ exists, deleted = false }: { exists: boolean; deleted?: boolean }) {
+  if (deleted) return <Badge variant="destructive" className="gap-1">Deleted</Badge>
   return exists ? (
     <Badge className="gap-1 border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/10">
       <CheckCircle2 className="h-3 w-3" aria-hidden />

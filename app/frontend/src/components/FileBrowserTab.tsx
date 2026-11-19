@@ -343,6 +343,11 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
     const [bulkEnableLoading, setBulkEnableLoading] = useState(false);
     const { presets, updatePreset } = useSavedFileFilters();
 
+    useEffect(() => {
+        if (!isActive || new URLSearchParams(window.location.search).has('pageSize')) return;
+        setItemsPerPage(defaultItemsPerPage);
+    }, [defaultItemsPerPage, isActive]);
+
     const [appliedFilters, setAppliedFilters] = useState<FileFilterState>(initialFileFilters);
 
     useEffect(() => {

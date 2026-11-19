@@ -105,8 +105,8 @@ interface TaskDialogProps {
   setSelectedFile?: React.Dispatch<React.SetStateAction<File | null>>;
   selectedFiles?: File[];
   tasks?: Task[];
-  onCreateTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
-  onTaskCreated?: () => void;
+  onCreateTask: (task: Omit<Task, 'id' | 'createdAt'>) => void | Promise<void>;
+  onTaskCreated?: () => void | Promise<void>;
   directoryTree?: Directory; // New prop for directory tree
   initialTaskType?: TaskDialogTaskType;
   initialLanguage?: string; // full language name like 'English', 'Japanese'
@@ -316,7 +316,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
   }, [open, selectedFile, selectedFiles, directoryTree]);
 
   // Handle create task
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (localFiles.length === 0 || taskType === null) return;
 
     if (taskType === 'merge') {
@@ -324,7 +324,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
       mergeMutation.mutate(fileIds);
       toast.success('Merge task created successfully!');
     } else {
-      localFiles.forEach(file => {
+      await Promise.all(localFiles.map(async file => {
         const taskData: Omit<Task, 'id' | 'createdAt'> = {
           file: file,
           type: taskType,
@@ -343,9 +343,9 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
           delete_video_after_completion: deleteVideoAfterCompletion,
           nvenc_overwrite_original: nvencOverwriteOriginal,
         };
-        onCreateTask(taskData);
-      });
-      onTaskCreated?.();
+        await onCreateTask(taskData);
+      }));
+      await onTaskCreated?.();
       onOpenChange(false);
     }
   };

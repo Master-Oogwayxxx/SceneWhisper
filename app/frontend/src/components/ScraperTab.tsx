@@ -125,6 +125,11 @@ export function ScraperTab({
   const [videoSortDir, setVideoSortDir] = useState<ScraperVideoSortDir>('asc')
   const [isVideoTableRefreshing, setIsVideoTableRefreshing] = useState(false)
 
+  useEffect(() => {
+    setSourcePageSize(settings.scraper_source_page_size as SourcePageSize)
+    setVideoPageSize(settings.scraper_video_page_size as ScraperVideoPageSize)
+  }, [settings.scraper_source_page_size, settings.scraper_video_page_size])
+
   const sourcesQuery = useQuery({
     queryKey: ['scraper', 'sources'],
     queryFn: scraperApi.getSources,

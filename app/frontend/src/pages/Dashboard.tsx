@@ -219,6 +219,11 @@ export const Dashboard = ({ tab, setTab, statsMinimized, highlightedTaskId, high
   const bulkRunCancelledRef = useRef(false);
   const [layoutMode, setLayoutMode] = useState<'grid' | 'tree'>(normalizeLayoutMode(settings.default_layout));
   const [taskQueueSearch, setTaskQueueSearch] = useState(() => getQueryParam('tasks.q') ?? '');
+
+  useEffect(() => {
+    if (tab !== 'tasks' || new URLSearchParams(window.location.search).has('tasks.pageSize')) return;
+    setTaskQueuePageSize(settings.task_queue_page_size);
+  }, [settings.task_queue_page_size, tab]);
   const [rerunSourceTask, setRerunSourceTask] = useState<Task | null>(null);
   const handleLayoutChange = (mode: 'grid' | 'tree') => {
     setLayoutMode(mode)
@@ -340,6 +345,11 @@ export const Dashboard = ({ tab, setTab, statsMinimized, highlightedTaskId, high
   });
 
   useEffect(() => {
+    if (tab !== 'monitors' || new URLSearchParams(window.location.search).has('monitors.pageSize')) return;
+    setPageSize(settings.directory_monitor_page_size as PageSize);
+  }, [settings.directory_monitor_page_size, tab, setPageSize]);
+
+  useEffect(() => {
     if (tab !== 'monitors') return;
     const url = new URL(window.location.href);
     const params = url.searchParams;
@@ -371,8 +381,11 @@ export const Dashboard = ({ tab, setTab, statsMinimized, highlightedTaskId, high
 
     try {
       const response = await taskApi.addTaskVideo(newTask);
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['stats'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+        queryClient.invalidateQueries({ queryKey: ['stats'] }),
+        queryClient.invalidateQueries({ queryKey: ['tasks', 'active-file-badges'] }),
+      ]);
       if (!response.duplicate) {
         toast.success('Task created successfully');
       }

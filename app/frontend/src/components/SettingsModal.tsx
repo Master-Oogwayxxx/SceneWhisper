@@ -938,7 +938,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 )}
 
                 {/* Scan */}
-                <div className="border-b border-border pb-1 mb-1">
+                <div className="pb-1 mb-1">
                   <div className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-3">
                     <div className="min-w-0">
                       <Label className="text-xs font-medium sm:text-sm">Scan</Label>
@@ -968,7 +968,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                       onCheckedChange={(v) => patchSettings({ auto_cleanup_on_scan: v })}
                     />
                   </SettingRow>
-                  <div className="mt-3 rounded-md border border-border p-3 space-y-3">
+                  <div className="mt-3 border-y border-border py-3 space-y-3">
                     <div className="flex items-start justify-between gap-4">
                       <div className="space-y-1">
                         <p className="text-xs font-medium sm:text-sm">Scheduled scan</p>
@@ -991,48 +991,52 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         }}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="scan-schedule-time" className="text-xs sm:text-sm">Run time</Label>
-                      <Input
-                        id="scan-schedule-time"
-                        type="time"
-                        className="h-8 text-xs sm:h-9 sm:text-sm"
-                        value={settings.scan_schedule_time ?? '09:00'}
-                        onChange={(e) => {
-                          const nextTime = e.target.value
-                          patchSettings({
-                            scan_schedule_time: nextTime || null,
-                            scan_schedule_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                          })
-                        }}
-                        disabled={!settings.scan_schedule_enabled}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="scan-schedule-mode" className="text-xs sm:text-sm">Scan scope</Label>
-                      <Select
-                        value={settings.scan_schedule_mode ?? 'all'}
-                        onValueChange={(value) => patchSettings({ scan_schedule_mode: value === 'selected' ? 'selected' : 'all' })}
-                        disabled={!settings.scan_schedule_enabled}
-                      >
-                        <SelectTrigger id="scan-schedule-mode" className="h-8 text-xs sm:h-9 sm:text-sm">
-                          <SelectValue placeholder="Scan all" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Scan all</SelectItem>
-                          <SelectItem value="selected">Selective scan</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      {settings.scan_schedule_mode === 'selected' && (
-                        <p className="text-[11px] text-muted-foreground sm:text-xs">
-                          Scheduled selective scans use the directories selected in the Scan section.
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-1 text-[11px] text-muted-foreground sm:text-xs">
-                      <p>Last run: {settings.scan_schedule_last_run ? formatUtcTimestampToLocal(settings.scan_schedule_last_run) : 'Not scheduled'}</p>
-                      <p>Next run: {settings.scan_schedule_next_run ? formatUtcTimestampToLocal(settings.scan_schedule_next_run) : 'Not scheduled'}</p>
-                    </div>
+                    {settings.scan_schedule_enabled && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="scan-schedule-time" className="text-xs sm:text-sm">Run time</Label>
+                          <Input
+                            id="scan-schedule-time"
+                            type="time"
+                            className="h-8 text-xs sm:h-9 sm:text-sm"
+                            value={settings.scan_schedule_time ?? '09:00'}
+                            onChange={(e) => {
+                              const nextTime = e.target.value
+                              patchSettings({
+                                scan_schedule_time: nextTime || null,
+                                scan_schedule_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                              })
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="scan-schedule-mode" className="text-xs sm:text-sm">Scan scope</Label>
+                          <Select
+                            value={settings.scan_schedule_mode ?? 'all'}
+                            onValueChange={(value) => patchSettings({ scan_schedule_mode: value === 'selected' ? 'selected' : 'all' })}
+                          >
+                            <SelectTrigger id="scan-schedule-mode" className="h-8 text-xs sm:h-9 sm:text-sm">
+                              <SelectValue placeholder="Scan all" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">Scan all</SelectItem>
+                              <SelectItem value="selected">Selective scan</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {settings.scan_schedule_mode === 'selected' && (
+                            <p className="text-[11px] text-muted-foreground sm:text-xs">
+                              Scheduled selective scans use the directories selected in the Scan section.
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    )}
+                    {settings.scan_schedule_enabled && (
+                      <div className="space-y-1 text-[11px] text-muted-foreground sm:text-xs">
+                        <p>Last run: {settings.scan_schedule_last_run ? formatUtcTimestampToLocal(settings.scan_schedule_last_run) : 'Not scheduled'}</p>
+                        <p>Next run: {settings.scan_schedule_next_run ? formatUtcTimestampToLocal(settings.scan_schedule_next_run) : 'Not scheduled'}</p>
+                      </div>
+                    )}
                     {settings.scan_schedule_last_error && (
                       <p className="text-xs text-destructive">{settings.scan_schedule_last_error}</p>
                     )}
@@ -1163,6 +1167,42 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   </div>
                 </div>
 
+                <div className="mt-3 mb-3 border-b border-border pb-3">
+                  <div className="mb-2">
+                    <Label className="text-xs font-medium sm:text-sm">Reset settings</Label>
+                    <p className="text-[11px] text-muted-foreground sm:text-xs">Restore the defaults for a settings tab.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" className={compactButtonClass} onClick={() => patchSettings({
+                      auto_cleanup_on_scan: false,
+                      scan_schedule_enabled: false,
+                      scan_schedule_time: null,
+                      scan_schedule_time_zone: null,
+                      scan_schedule_mode: 'all',
+                      task_type_priority: ['all', 'merge', 'subtitle', 'split', 'scene', 'analyze_frame_pacing', 'nvenc_frame_pacing', 'remux'],
+                      processing_hours_enabled: false,
+                    })}>
+                      <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      Actions
+                    </Button>
+                    <Button variant="outline" size="sm" className={compactButtonClass} onClick={() => patchSettings({
+                      default_task_type: 'split',
+                      default_layout: 'grid',
+                      default_sort_field: 'name',
+                      default_sort_direction: 'asc',
+                      default_subtitle_language: 'en',
+                      show_stats_panel: true,
+                    })}>
+                      <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      App Behavior
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => patchSettings({ ...PROCESSING_SETTINGS_DEFAULTS })} className={compactButtonClass}>
+                      <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      Processing
+                    </Button>
+                  </div>
+                </div>
+
                 <ProcessingHoursSettings
                   enabled={settings.processing_hours_enabled}
                   windows={localProcessingWindows}
@@ -1203,7 +1243,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     </SelectContent>
                   </Select>
                 </SettingRow>
-                <div className="border-t border-border pt-3 mt-3 mb-1">
+                <div className="pt-3 mt-3 mb-1">
                   <Label className="text-xs font-medium sm:text-sm">Pagination defaults</Label>
                   <p className="text-[11px] text-muted-foreground sm:text-xs">Choose the initial number of rows shown by each paginated page.</p>
                 </div>
@@ -1216,7 +1256,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   ['actress_works_page_size', 'Actress Works'],
                   ['deleted_history_page_size', 'Deleted History'],
                 ] as const).map(([key, label]) => (
-                  <SettingRow key={key} label={label}>
+                  <SettingRow key={key} label={label} className="border-0">
                     <Select
                       value={String(settings[key])}
                       onValueChange={(value) => patchSettings({ [key]: Number(value) })}
@@ -1230,6 +1270,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     </Select>
                   </SettingRow>
                 ))}
+                <div className="border-b border-border pb-1 mb-1" />
                 <SettingRow label="Default sort field">
                   <Select
                     value={settings.default_sort_field}
@@ -1602,17 +1643,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               </TabsContent>
 
               <TabsContent value="processing" className="mt-2 sm:mt-4">
-                <div className="mb-2 flex justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => patchSettings({ ...PROCESSING_SETTINGS_DEFAULTS })}
-                    className={compactButtonClass}
-                  >
-                    <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    Reset
-                  </Button>
-                </div>
                 <SettingRow label="Task poll interval (ms)">
                   <Input type="number" min={500} step={500} value={settings.task_poll_interval_ms}
                     onChange={(e) => patchSettings({ task_poll_interval_ms: Number(e.target.value) })} className={cn(compactInputClass, "w-20 sm:w-24")} />

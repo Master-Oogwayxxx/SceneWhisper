@@ -264,6 +264,11 @@ export const ActressTab = () => {
       ? value
       : settings.actress_works_page_size
   })
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has('worksPageSize')) return
+    setWorksPageSize(settings.actress_works_page_size)
+  }, [settings.actress_works_page_size])
   const [worksSortBy, setWorksSortBy] = useState(() => {
     const value = new URLSearchParams(window.location.search).get('worksSort')
     return value === 'id' || value === 'title' || value === 'date' ? value : 'date'

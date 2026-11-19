@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Search, Trash2 } from 'lucide-react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { fileApi } from '@/api/files'
@@ -170,6 +170,10 @@ export function DeletedHistoryTab() {
   const { settings } = useSettings()
   const [pageSize, setPageSize] = useState(settings.deleted_history_page_size)
   const [isRefreshSpinning, setIsRefreshSpinning] = useState(false)
+
+  useEffect(() => {
+    setPageSize(settings.deleted_history_page_size)
+  }, [settings.deleted_history_page_size])
 
   const query = useQuery({
     queryKey: ['deleted-history', page, pageSize, submittedSearch, fileType],

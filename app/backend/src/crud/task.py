@@ -1,4 +1,5 @@
 import logging
+import json
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -30,6 +31,29 @@ def _duration_to_seconds(duration: str | int | float | None) -> float | None:
         return None
     total = hours * 3600 + minutes * 60 + seconds
     return total if total > 0 else None
+
+
+def _file_record_to_model(file_record: FileRecord) -> File:
+    return File(
+        id=file_record.id,
+        name=file_record.name,
+        path=file_record.path,
+        size=file_record.size,
+        duration=file_record.duration,
+        format=file_record.format,
+        parent_id=file_record.parent_id,
+        width=file_record.width,
+        height=file_record.height,
+        fps=file_record.fps,
+        codec=file_record.codec,
+        bitrate=file_record.bitrate,
+        file_type=file_record.file_type,
+        last_scanned_at=utc_isoformat(file_record.last_scanned_at) if file_record.last_scanned_at else None,
+        queue_disabled=file_record.queue_disabled or False,
+        split_disabled=file_record.split_disabled or False,
+        subtitle_disabled=file_record.subtitle_disabled or False,
+        is_deleted=file_record.is_deleted or False,
+    )
 
 
 def _apply_task_filters(
@@ -91,26 +115,7 @@ def record_to_task(record: TaskRecord, file_record: FileRecord = None) -> Task:
                 close_db(db)
 
         if file_record:
-            file = File(
-                id=file_record.id,
-                name=file_record.name,
-                path=file_record.path,
-                size=file_record.size,
-                duration=file_record.duration,
-                format=file_record.format,
-                parent_id=file_record.parent_id,
-                width=file_record.width,
-                height=file_record.height,
-                fps=file_record.fps,
-                codec=file_record.codec,
-                bitrate=file_record.bitrate,
-                file_type=file_record.file_type,
-                last_scanned_at=utc_isoformat(file_record.last_scanned_at) if file_record.last_scanned_at else None,
-                queue_disabled=file_record.queue_disabled or False,
-                split_disabled=file_record.split_disabled or False,
-                subtitle_disabled=file_record.subtitle_disabled or False,
-                is_deleted=file_record.is_deleted or False,
-            )
+            file = _file_record_to_model(file_record)
         else:
             logging.warning(f"File with ID {record.file_id} not found for Task {record.id}")
 
@@ -144,6 +149,7 @@ def record_to_task(record: TaskRecord, file_record: FileRecord = None) -> Task:
         overwrite_scenes=record.overwrite_scenes or False,
         overwrite_split=record.overwrite_split or False,
         bypass_split_guard=record.bypass_split_guard or False,
+        bypass_scene_count_guard=record.bypass_scene_count_guard or False,
         overwrite_subtitles=record.overwrite_subtitles or False,
         delete_video_after_completion=record.delete_video_after_completion or False,
         nvenc_overwrite_original=record.nvenc_overwrite_original or False,
@@ -192,6 +198,7 @@ def create_task(task: Task) -> Task:
             overwrite_scenes=task.overwrite_scenes or False,
             overwrite_split=task.overwrite_split or False,
             bypass_split_guard=task.bypass_split_guard or False,
+            bypass_scene_count_guard=task.bypass_scene_count_guard or False,
             overwrite_subtitles=task.overwrite_subtitles or False,
             delete_video_after_completion=task.delete_video_after_completion or False,
             nvenc_overwrite_original=task.nvenc_overwrite_original or False,
@@ -451,7 +458,7 @@ def get_task_ids_by_file_and_statuses(file_id: str, statuses: list[str]) -> list
 
 
 def get_file_badge_tasks() -> List[Task]:
-    """Return active tasks and only the newest terminal task for each file."""
+    """Return file tasks plus active merge tasks attached to each input file."""
     db = get_db()
     try:
         terminal_statuses = [TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED]
@@ -486,7 +493,37 @@ def get_file_badge_tasks() -> List[Task]:
             .order_by(TaskRecord.created_at.desc())
             .all()
         )
-        return [record_to_task(task_record, file_record) for task_record, file_record in results]
+        badge_tasks = [record_to_task(task_record, file_record) for task_record, file_record in results]
+
+        # Merge tasks intentionally have no single output file while queued or
+        # processing. Attach a copy to each input file so every source card can
+        # display the active-task badge.
+        merge_tasks = (
+            db.query(TaskRecord)
+            .filter(
+                TaskRecord.type == TaskType.MERGE,
+                TaskRecord.status.in_([TaskStatus.QUEUED, TaskStatus.PROCESSING]),
+                TaskRecord.merge_input_paths.isnot(None),
+            )
+            .order_by(TaskRecord.created_at.desc())
+            .all()
+        )
+        for merge_record in merge_tasks:
+            try:
+                input_paths = json.loads(merge_record.merge_input_paths or "[]")
+            except (TypeError, json.JSONDecodeError):
+                input_paths = []
+            if not isinstance(input_paths, list):
+                continue
+
+            input_files = db.query(FileRecord).filter(FileRecord.path.in_(input_paths)).all()
+            merge_task = record_to_task(merge_record)
+            badge_tasks.extend(
+                merge_task.model_copy(update={"file": _file_record_to_model(file_record)})
+                for file_record in input_files
+            )
+
+        return badge_tasks
     except Exception as exc:
         logging.error("Error fetching file badge tasks: %s", exc)
         return []

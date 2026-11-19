@@ -229,6 +229,7 @@ async def add_task_video(task: Task, db: Session = Depends(db_session)):
             overwrite_scenes=task.overwrite_scenes,
             overwrite_split=task.overwrite_split,
             bypass_split_guard=task.bypass_split_guard,
+            bypass_scene_count_guard=task.bypass_scene_count_guard,
             overwrite_subtitles=task.overwrite_subtitles,
             scene_detector=task.scene_detector,
             delete_video_after_completion=task.delete_video_after_completion,

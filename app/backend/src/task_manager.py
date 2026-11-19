@@ -1668,7 +1668,7 @@ class TaskManager:
                 await self._release_scene_detection_slot()
                 scene_detection_slot_acquired = False
 
-            if task.type in (TaskType.SPLIT, TaskType.ALL) and len(scenes) <= 1:
+            if task.type in (TaskType.SPLIT, TaskType.ALL) and len(scenes) <= 1 and not task.bypass_scene_count_guard:
                 raise ValueError(f"Scene detection found only {len(scenes)} scene(s); at least 2 required to split")
 
             if task.type in (TaskType.SPLIT, TaskType.ALL):

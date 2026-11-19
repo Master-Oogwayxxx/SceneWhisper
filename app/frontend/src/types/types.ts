@@ -110,6 +110,7 @@ export interface Task {
   overwrite_scenes?: boolean
   overwrite_split?: boolean
   bypass_split_guard?: boolean
+  bypass_scene_count_guard?: boolean
   overwrite_subtitles?: boolean
   scene_detector?: string
   delete_video_after_completion?: boolean

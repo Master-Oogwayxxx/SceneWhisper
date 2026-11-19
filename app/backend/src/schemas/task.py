@@ -42,6 +42,7 @@ class TaskRecord(Base):
     overwrite_scenes = Column(Boolean, default=False, nullable=False)
     overwrite_split = Column(Boolean, default=False, nullable=False)
     bypass_split_guard = Column(Boolean, default=False, nullable=False)
+    bypass_scene_count_guard = Column(Boolean, default=False, nullable=False)
     overwrite_subtitles = Column(Boolean, default=False, nullable=False)
     delete_video_after_completion = Column(Boolean, default=False, nullable=False)
     nvenc_overwrite_original = Column(Boolean, default=False, nullable=False)

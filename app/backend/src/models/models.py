@@ -312,6 +312,7 @@ class Task(BaseModel):
     overwrite_scenes: Optional[bool] = False
     overwrite_split: Optional[bool] = False
     bypass_split_guard: Optional[bool] = False
+    bypass_scene_count_guard: Optional[bool] = False
     overwrite_subtitles: Optional[bool] = False
     scene_detector: Optional[str] = None
     delete_video_after_completion: Optional[bool] = False

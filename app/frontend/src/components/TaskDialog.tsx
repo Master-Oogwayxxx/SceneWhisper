@@ -248,6 +248,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
   const [overwriteScenes, setOverwriteScenes] = useState(false);
   const [overwriteSplit, setOverwriteSplit] = useState(false);
   const [bypassSplitGuard, setBypassSplitGuard] = useState(false);
+  const [bypassSceneCountGuard, setBypassSceneCountGuard] = useState(false);
   const [overwriteSubtitles, setOverwriteSubtitles] = useState(false);
   const [sceneDetector, setSceneDetector] = useState<string>('');
   const [deleteVideoAfterCompletion, setDeleteVideoAfterCompletion] = useState(false);
@@ -265,6 +266,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
       setOverwriteScenes(initialOverwriteScenes ?? false);
       setOverwriteSplit(initialOverwriteSplit ?? false);
       setBypassSplitGuard(false);
+      setBypassSceneCountGuard(false);
       setOverwriteSubtitles(initialOverwriteSubtitles ?? false);
       setDeleteVideoAfterCompletion(initialDeleteVideoAfterCompletion ?? false);
       setNvencOverwriteOriginal(initialNvencOverwriteOriginal ?? true);
@@ -306,6 +308,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
       setOverwriteScenes(false);
       setOverwriteSplit(false);
       setBypassSplitGuard(false);
+      setBypassSceneCountGuard(false);
       setOverwriteSubtitles(false);
       setDeleteVideoAfterCompletion(false);
       setNvencOverwriteOriginal(true);
@@ -334,6 +337,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
           overwrite_scenes: overwriteScenes,
           overwrite_split: overwriteSplit,
           bypass_split_guard: bypassSplitGuard,
+          bypass_scene_count_guard: bypassSceneCountGuard,
           overwrite_subtitles: overwriteSubtitles,
           scene_detector: sceneDetector || settings.scene_detector,
           delete_video_after_completion: deleteVideoAfterCompletion,
@@ -672,6 +676,19 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
                 id="bypass-split-check"
                 checked={bypassSplitGuard}
                 onCheckedChange={setBypassSplitGuard}
+              />
+            </div>
+          )}
+
+          {(taskType === 'split' || taskType === 'all') && localFiles.length > 0 && (
+            <div className="flex items-center justify-between gap-4 py-1">
+              <label htmlFor="bypass-scene-count-check" className="text-sm cursor-pointer select-none">
+                Bypass scene count check
+              </label>
+              <Switch
+                id="bypass-scene-count-check"
+                checked={bypassSceneCountGuard}
+                onCheckedChange={setBypassSceneCountGuard}
               />
             </div>
           )}

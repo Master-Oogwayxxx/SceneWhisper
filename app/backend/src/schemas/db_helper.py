@@ -133,6 +133,16 @@ def _ensure_task_bypass_split_guard_column() -> None:
             logging.info("Migrated: added bypass_split_guard column to tasks")
 
 
+def _ensure_task_bypass_scene_count_guard_column() -> None:
+    """Add bypass_scene_count_guard column to tasks table if absent."""
+    with engine.connect() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(tasks)"))]
+        if "bypass_scene_count_guard" not in cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN bypass_scene_count_guard BOOLEAN NOT NULL DEFAULT 0"))
+            conn.commit()
+            logging.info("Migrated: added bypass_scene_count_guard column to tasks")
+
+
 def _ensure_nvenc_overwrite_original_column() -> None:
     """Add nvenc_overwrite_original column to tasks table if absent (migration)."""
     with engine.connect() as conn:
@@ -932,6 +942,7 @@ def init_db():
     _ensure_selected_scan_directories_column()
     _ensure_task_scene_detector_column()
     _ensure_task_bypass_split_guard_column()
+    _ensure_task_bypass_scene_count_guard_column()
     _ensure_nvenc_overwrite_original_column()
     _ensure_scene_detector_settings_columns()
     _ensure_paused_at_column()

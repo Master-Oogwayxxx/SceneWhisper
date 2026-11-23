@@ -15,6 +15,7 @@ from ..schemas.directory_monitor import DirectoryMonitorRecord
 from ..schemas.file import FileRecord
 from ..schemas.scene import SceneRecord
 from ..schemas.task import TaskRecord
+from .setting import get_settings
 
 
 def _duration_to_seconds(duration: str | int | float | None) -> float | None:
@@ -31,6 +32,31 @@ def _duration_to_seconds(duration: str | int | float | None) -> float | None:
         return None
     total = hours * 3600 + minutes * 60 + seconds
     return total if total > 0 else None
+
+
+def _task_priority_order_clause():
+    """Return the configured task-type priority expression for queue queries."""
+    settings = get_settings()
+    raw_priority = settings.task_type_priority
+    try:
+        priority_order = json.loads(raw_priority) if raw_priority else []
+    except (TypeError, json.JSONDecodeError):
+        priority_order = []
+
+    if not isinstance(priority_order, list):
+        priority_order = []
+
+    default_order = [
+        "all", "merge", "subtitle", "split", "scene",
+        "analyze_frame_pacing", "nvenc_frame_pacing", "remux",
+    ]
+    priority_order = priority_order or default_order
+    ranks = {task_type: rank for rank, task_type in enumerate(priority_order)}
+    return case(
+        ranks,
+        value=TaskRecord.type,
+        else_=len(priority_order),
+    )
 
 
 def _file_record_to_model(file_record: FileRecord) -> File:
@@ -562,7 +588,11 @@ def get_tasks_by_status(status: TaskStatus) -> List[Task]:
         ).filter(TaskRecord.status == status)
 
         if status == TaskStatus.QUEUED:
-            query = query.order_by(nullslast(TaskRecord.queue_position.asc()), TaskRecord.created_at.asc())
+            query = query.order_by(
+                _task_priority_order_clause(),
+                nullslast(TaskRecord.queue_position.asc()),
+                TaskRecord.created_at.asc(),
+            )
         elif status == TaskStatus.PAUSED:
             query = query.order_by(nullslast(TaskRecord.paused_at.desc()), TaskRecord.created_at.desc())
         elif status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):
@@ -622,7 +652,11 @@ def get_tasks_by_status_paginated(
         )
 
         if status == TaskStatus.QUEUED:
-            query = query.order_by(nullslast(TaskRecord.queue_position.asc()), TaskRecord.created_at.asc())
+            query = query.order_by(
+                _task_priority_order_clause(),
+                nullslast(TaskRecord.queue_position.asc()),
+                TaskRecord.created_at.asc(),
+            )
         elif status == TaskStatus.PAUSED:
             query = query.order_by(nullslast(TaskRecord.paused_at.desc()), TaskRecord.created_at.desc())
         elif status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.CANCELLED):

@@ -11,6 +11,7 @@ import { taskApi } from '@/api/tasks'
 import { useUnpauseTask, useDeleteTask } from '@/hooks/useTasks'
 import { TaskCard } from './TaskCard'
 import { toast } from 'sonner'
+import { formatFileSize } from '@/lib/utils'
 
 interface FileTasksDialogProps {
   file: File
@@ -69,6 +70,9 @@ export function FileTasksDialog({ file, open, onOpenChange }: FileTasksDialogPro
 
         <DialogHeader className="shrink-0">
           <DialogTitle>Tasks — {file.name}</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Total space: {formatFileSize(file.size)}
+          </p>
         </DialogHeader>
 
         <div className="overflow-y-auto flex-1 min-h-0">

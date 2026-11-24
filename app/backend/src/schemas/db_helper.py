@@ -931,6 +931,32 @@ def _ensure_pagination_settings_columns() -> None:
         conn.commit()
 
 
+def _ensure_file_normalized_video_code_column() -> None:
+    """Add and backfill the indexed filename code used by actress-work filters."""
+    from ..utils import extract_normalized_video_code
+
+    with engine.begin() as conn:
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(files)"))}
+        added_column = "normalized_video_code" not in columns
+        if added_column:
+            conn.execute(text("ALTER TABLE files ADD COLUMN normalized_video_code TEXT"))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_files_active_video_code "
+            "ON files (is_deleted, file_type, normalized_video_code)"
+        ))
+        if added_column:
+            rows = conn.execute(text("SELECT id, name FROM files")).fetchall()
+            updates = [
+                {"file_id": file_id, "video_code": extract_normalized_video_code(name)}
+                for file_id, name in rows
+            ]
+            if updates:
+                conn.execute(
+                    text("UPDATE files SET normalized_video_code = :video_code WHERE id = :file_id"),
+                    updates,
+                )
+
+
 def init_db():
     """Initialize database tables"""
     from ..log_handler import mark_db_ready
@@ -950,6 +976,7 @@ def init_db():
     _ensure_stage_elapsed_columns()
     _ensure_queue_disabled_column()
     _ensure_file_is_deleted_column()
+    _ensure_file_normalized_video_code_column()
     _ensure_scene_cache_column()
     _ensure_file_filter_indexes()
     _ensure_actress_work_file_state_table()

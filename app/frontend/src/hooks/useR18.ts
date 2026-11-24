@@ -77,6 +77,12 @@ export function useR18ActressWorks(
   filters: ActressWorksFilterState = EMPTY_ACTRESS_WORKS_FILTER_STATE
 ) {
   const queryClient = useQueryClient()
+  const hasExpensiveFileFilter = filters.fileExists !== null ||
+    filters.localFileStatus !== null ||
+    filters.uncensored !== null ||
+    filters.censored !== null ||
+    filters.subtitled !== null ||
+    filters.resolution.length > 0
   const query = useQuery({
     queryKey: r18Keys.actressWorks(id ?? 0, page, pageSize, sortBy, sortDir, search, filters),
     queryFn: () => r18Api.getActressWorks(id!, page * pageSize, pageSize, sortBy, sortDir, search, filters),
@@ -86,7 +92,7 @@ export function useR18ActressWorks(
   })
 
   useEffect(() => {
-    if (!enabled || id === null || !query.data) return
+    if (!enabled || id === null || !query.data || hasExpensiveFileFilter) return
 
     const totalPages = Math.ceil(query.data.total / pageSize)
     const adjacentPages = [page - 1, page + 1].filter((candidate) => candidate >= 0 && candidate < totalPages)
@@ -97,7 +103,7 @@ export function useR18ActressWorks(
         staleTime: 5 * 60 * 1000,
       })
     }
-  }, [enabled, filters, id, page, pageSize, query.data, queryClient, search, sortBy, sortDir])
+  }, [enabled, filters, hasExpensiveFileFilter, id, page, pageSize, query.data, queryClient, search, sortBy, sortDir])
 
   return query
 }

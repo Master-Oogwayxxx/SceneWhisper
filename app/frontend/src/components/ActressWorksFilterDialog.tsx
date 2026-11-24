@@ -2,6 +2,7 @@ import { Activity, Calendar, Download, FileVideo, Filter, Tag } from 'lucide-rea
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog'
 import { Label } from './ui/label'
+import { Checkbox } from './ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { ActressWorksFilterState, ActressWorkLocalFileStatusFilter, ActressWorkResolutionFilter, ActressWorkTorrentStatusFilter, ActressWorkMetadataSourceFilter } from '@/lib/actress-works-filters'
 
@@ -140,16 +141,27 @@ export function ActressWorksFilterDialog({
             </div>
             <div className="flex flex-col gap-2">
               <Label className="flex items-center gap-2 text-sm font-medium"><Activity className="h-3.5 w-3.5" />Resolution</Label>
-              <Select
-                value={draft.resolution ?? 'all'}
-                onValueChange={(v) => onDraftChange({ resolution: v === 'all' ? null : v as ActressWorkResolutionFilter })}
-              >
-                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All resolutions</SelectItem>
-                  {RESOLUTION_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="rounded-md border px-3 py-2">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  {RESOLUTION_OPTIONS.map((option) => {
+                    const checked = draft.resolution.includes(option.value)
+                    return (
+                      <label key={option.value} className="flex cursor-pointer items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => onDraftChange({
+                            resolution: value
+                              ? [...draft.resolution, option.value]
+                              : draft.resolution.filter((resolution) => resolution !== option.value),
+                          })}
+                        />
+                        {option.label}
+                      </label>
+                    )
+                  })}
+                </div>
+                {draft.resolution.length === 0 && <p className="mt-1 text-xs text-muted-foreground">All resolutions</p>}
+              </div>
             </div>
             <div className="flex flex-col gap-2 pl-0.5">
               <Label className="flex items-center gap-2 text-sm font-medium"><Calendar className="h-3.5 w-3.5" />Release year</Label>

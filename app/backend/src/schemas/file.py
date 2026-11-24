@@ -11,6 +11,7 @@ class FileRecord(Base):
 
     id = Column(String, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    normalized_video_code = Column(String, nullable=True)
     path = Column(String, nullable=False, unique=True)
     size = Column(Integer, nullable=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

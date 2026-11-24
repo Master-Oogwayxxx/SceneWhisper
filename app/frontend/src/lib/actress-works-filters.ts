@@ -28,7 +28,7 @@ export interface ActressWorksFilterState {
   uncensored: boolean | null
   censored: boolean | null
   subtitled: boolean | null
-  resolution: ActressWorkResolutionFilter | null
+  resolution: ActressWorkResolutionFilter[]
   opened: boolean | null     // null = no filter; true = opened; false = not opened
   openedSite: string | null
   releaseYear: number | null // null = no filter; 4-digit year otherwise
@@ -42,7 +42,7 @@ export const EMPTY_ACTRESS_WORKS_FILTER_STATE: ActressWorksFilterState = {
   uncensored: null,
   censored: null,
   subtitled: null,
-  resolution: null,
+  resolution: [],
   opened: null,
   openedSite: null,
   releaseYear: null,
@@ -51,7 +51,7 @@ export const EMPTY_ACTRESS_WORKS_FILTER_STATE: ActressWorksFilterState = {
 }
 
 export function isActressWorksFilterActive(f: ActressWorksFilterState): boolean {
-  return f.fileExists !== null || f.localFileStatus !== null || f.uncensored !== null || f.censored !== null || f.subtitled !== null || f.resolution !== null || f.opened !== null || f.openedSite !== null || f.releaseYear !== null || f.torrentStatus !== null || f.metadataSource !== null
+  return f.fileExists !== null || f.localFileStatus !== null || f.uncensored !== null || f.censored !== null || f.subtitled !== null || f.resolution.length > 0 || f.opened !== null || f.openedSite !== null || f.releaseYear !== null || f.torrentStatus !== null || f.metadataSource !== null
 }
 
 export function filterActressWorksByMetadataSource(works: ActressWork[], source: ActressWorkMetadataSourceFilter | null): ActressWork[] {

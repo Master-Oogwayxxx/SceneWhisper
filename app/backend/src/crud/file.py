@@ -54,6 +54,7 @@ class File:
         file_metadata = FileRecord(
             id=file_id,
             name=name,
+            normalized_video_code=extract_normalized_video_code(name),
             path=path,
             size=size,
             format=format,

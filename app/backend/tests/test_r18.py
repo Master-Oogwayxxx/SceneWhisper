@@ -1040,6 +1040,42 @@ def test_resolve_badge_filter_includes_resolution_matches(monkeypatch):
         db.close()
 
 
+def test_resolve_badge_filter_uses_indexed_codes_for_multiple_resolutions(monkeypatch):
+    from datetime import datetime
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from src.api import r18
+    from src.schemas.db_helper import Base
+    from src.schemas.file import FileRecord
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine)
+    db = Session()
+    monkeypatch.setattr(
+        r18.r18_actress,
+        "get_all_actress_content_ids",
+        lambda actress_id: [("abc123", None), ("def456", None), ("ghi789", None)],
+    )
+    try:
+        now = datetime.utcnow()
+        db.add_all([
+            FileRecord(id="file-720p", name="ABC-123.mp4", normalized_video_code="ABC-123", path="/videos/ABC-123.mp4", size=1, directory_id="dir-1", file_type="video", height=720, created_at=now, modified_at=now, is_deleted=False),
+            FileRecord(id="file-1080p", name="DEF-456.mp4", normalized_video_code="DEF-456", path="/videos/DEF-456.mp4", size=1, directory_id="dir-1", file_type="video", height=1080, created_at=now, modified_at=now, is_deleted=False),
+            FileRecord(id="file-4k", name="GHI-789.mp4", normalized_video_code="GHI-789", path="/videos/GHI-789.mp4", size=1, directory_id="dir-1", file_type="video", height=2160, created_at=now, modified_at=now, is_deleted=False),
+        ])
+        db.commit()
+
+        include, exclude = r18._resolve_badge_filter(1, db, resolution="720p,1080p")
+
+        assert include == frozenset({"abc123", "def456"})
+        assert exclude is None
+    finally:
+        db.close()
+
+
 def test_resolve_file_exists_filter_deleted_excludes_current_file(monkeypatch):
     from datetime import datetime
 

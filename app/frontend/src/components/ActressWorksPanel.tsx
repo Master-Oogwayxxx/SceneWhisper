@@ -210,7 +210,7 @@ export interface ActressWorksPanelProps {
   selectedCodes: Set<string>
   selectedWorks?: ActressWork[]
   onToggleSelect: (work: ActressWork, shiftKey?: boolean) => void
-  onSelectAll?: () => void
+  onSelectAll?: (visibleWorks: ActressWork[]) => void
   onToggleCovers: (checked: boolean) => void
   onToggleTitles: (checked: boolean) => void
   onWorksPageChange: (page: number) => void
@@ -959,7 +959,7 @@ export function ActressWorksPanel({
                   variant="outline"
                   size="sm"
                   className={`h-9 text-sm ${focuslessOutlineButtonClass}`}
-                  onClick={onSelectAll}
+                  onClick={() => onSelectAll(pagedFilteredWorks)}
                 >
                   Select All
                 </Button>

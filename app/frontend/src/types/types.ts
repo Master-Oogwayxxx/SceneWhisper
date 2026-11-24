@@ -304,7 +304,7 @@ export interface ActressDownloadMonitorCriteria {
   uncensored?: boolean | null
   censored?: boolean | null
   subtitled?: boolean | null
-  resolution?: 'sd' | '720p' | '1080p' | '1440p' | '4k' | null
+  resolution?: string | null
   releaseYear?: number | null
 }
 

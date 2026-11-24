@@ -1103,6 +1103,7 @@ async def rename_file(file_id: str, body: RenameFileRequest, db: Session = Depen
 
     try:
         record.name = body.new_name
+        record.normalized_video_code = extract_normalized_video_code(body.new_name)
         record.path = new_path
         # Matching state is keyed by path, which may already have a deleted entry.
         # Reuse the destination state without changing the deletion history ledger.

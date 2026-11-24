@@ -589,7 +589,7 @@ export const ActressTab = () => {
             uncensored: worksFilter.uncensored,
             censored: worksFilter.censored,
             subtitled: worksFilter.subtitled,
-            resolution: worksFilter.resolution,
+            resolution: worksFilter.resolution.length ? worksFilter.resolution.join(',') : null,
             releaseYear: worksFilter.releaseYear,
           },
           maxItemsPerRun: patch.maxItemsPerRun,
@@ -706,7 +706,7 @@ export const ActressTab = () => {
       while (skip < total) {
         const resp = await r18Api.getActressWorks(
           detail.id, skip, pageSize, worksSortBy, worksSortDir, worksSearch,
-          { fileExists: worksFilter.fileExists, localFileStatus: worksFilter.localFileStatus, uncensored: worksFilter.uncensored, censored: worksFilter.censored, subtitled: worksFilter.subtitled, resolution: worksFilter.resolution, opened: worksFilter.opened, releaseYear: worksFilter.releaseYear }
+          { fileExists: worksFilter.fileExists, localFileStatus: worksFilter.localFileStatus, uncensored: worksFilter.uncensored, censored: worksFilter.censored, subtitled: worksFilter.subtitled, resolution: worksFilter.resolution.length ? worksFilter.resolution.join(',') : null, opened: worksFilter.opened, releaseYear: worksFilter.releaseYear }
         )
         total = resp.total
         const filteredItems = filterActressWorksByOpenedState(resp.items, worksFilter.opened)
@@ -1318,8 +1318,7 @@ export const ActressTab = () => {
                     selectedCodes={selectedCodes}
                     selectedWorks={selectedWorks}
                     onToggleSelect={handleToggleSelect}
-                    onSelectAll={() => {
-                      const nextWorks = worksResults?.items ?? []
+                    onSelectAll={(nextWorks) => {
                       setSelectedCodes((prev) => new Set([...prev, ...nextWorks.map((w) => w.content_id)]))
                       setSelectedWorks((prev) => mergeSelectedWorks(prev, nextWorks))
                     }}

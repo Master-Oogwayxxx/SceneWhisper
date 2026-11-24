@@ -83,7 +83,7 @@ export const r18Api = {
     sortBy = 'date',
     sortDir = 'desc',
     search = '',
-    filters: { fileExists?: boolean | null; localFileStatus?: string | null; uncensored?: boolean | null; censored?: boolean | null; subtitled?: boolean | null; resolution?: string | null; opened?: boolean | null; releaseYear?: number | null; torrentStatus?: string | null } = {}
+    filters: { fileExists?: boolean | null; localFileStatus?: string | null; uncensored?: boolean | null; censored?: boolean | null; subtitled?: boolean | null; resolution?: string | string[] | null; opened?: boolean | null; releaseYear?: number | null; torrentStatus?: string | null } = {}
   ): Promise<ActressWorksResponse> {
     const params = new URLSearchParams({
       skip: String(skip),
@@ -97,7 +97,7 @@ export const r18Api = {
     if (filters.uncensored !== null && filters.uncensored !== undefined) params.set('uncensored', String(filters.uncensored))
     if (filters.censored !== null && filters.censored !== undefined) params.set('censored', String(filters.censored))
     if (filters.subtitled !== null && filters.subtitled !== undefined) params.set('subtitled', String(filters.subtitled))
-    if (filters.resolution !== null && filters.resolution !== undefined) params.set('resolution', filters.resolution)
+    if (filters.resolution !== null && filters.resolution !== undefined) params.set('resolution', Array.isArray(filters.resolution) ? filters.resolution.join(',') : filters.resolution)
     if (filters.opened !== null && filters.opened !== undefined) params.set('opened', String(filters.opened))
     if (filters.releaseYear !== null && filters.releaseYear !== undefined) params.set('release_year', String(filters.releaseYear))
     if (filters.torrentStatus !== null && filters.torrentStatus !== undefined) params.set('torrent_status', filters.torrentStatus)

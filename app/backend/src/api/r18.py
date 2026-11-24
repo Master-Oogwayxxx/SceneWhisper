@@ -530,6 +530,58 @@ def _resolution_bucket(height: int | None) -> str | None:
     return "4k"
 
 
+def _resolve_resolution_filter(
+    actress_id: int,
+    db: Session,
+    resolution: str,
+) -> tuple[frozenset[str] | None, frozenset[str] | None]:
+    """Resolve resolution matches with the indexed normalized file code."""
+    requested_resolutions = {value.strip() for value in resolution.split(",") if value.strip()}
+    works_ids = r18_actress.get_all_actress_content_ids(actress_id)
+    if not works_ids or not requested_resolutions:
+        return frozenset(), None
+
+    search_id_to_content_ids, all_search_ids = _search_ids_by_content_id(works_ids)
+    if not all_search_ids:
+        return frozenset(), None
+
+    rows = []
+    for start in range(0, len(all_search_ids), 500):
+        rows.extend(
+            db.query(FileRecord.normalized_video_code, FileRecord.height)
+            .filter(
+                FileRecord.is_deleted == False,  # noqa: E712
+                FileRecord.file_type == "video",
+                FileRecord.normalized_video_code.in_(all_search_ids[start : start + 500]),
+            )
+            .all()
+        )
+    matched_sids = {
+        row.normalized_video_code
+        for row in rows
+        if row.normalized_video_code and _resolution_bucket(row.height) in requested_resolutions
+    }
+
+    # Records constructed outside the normal file-ingestion path may not yet
+    # have a normalized code. Keep compatibility without penalizing migrated data.
+    legacy_rows = (
+        db.query(FileRecord.name, FileRecord.height)
+        .filter(
+            FileRecord.is_deleted == False,  # noqa: E712
+            FileRecord.file_type == "video",
+            FileRecord.normalized_video_code.is_(None),
+        )
+        .all()
+    )
+    if legacy_rows:
+        search_pairs = _search_id_pairs(all_search_ids)
+        for row in legacy_rows:
+            if _resolution_bucket(row.height) in requested_resolutions:
+                matched_sids.update(_matching_search_ids(search_pairs, row.name))
+
+    return _content_ids_for_sids(search_id_to_content_ids, matched_sids), None
+
+
 def _resolve_file_exists_filter(
     file_exists: bool | None,
     actress_id: int,
@@ -614,6 +666,8 @@ def _resolve_badge_filter(
 ) -> tuple[frozenset[str] | None, frozenset[str] | None]:
     if uncensored is None and censored is None and subtitled is None and resolution is None:
         return None, None
+    if resolution is not None and uncensored is None and censored is None and subtitled is None:
+        return _resolve_resolution_filter(actress_id, db, resolution)
 
     works_ids = r18_actress.get_all_actress_content_ids(actress_id)
     if not works_ids:
@@ -632,6 +686,7 @@ def _resolve_badge_filter(
     uncensored_sids: set[str] = set()
     subtitled_sids: set[str] = set()
     resolution_sids: set[str] = set()
+    requested_resolutions = {value.strip() for value in (resolution or '').split(',') if value.strip()}
     for row in current_rows:
         matching_sids = _matching_search_ids(search_pairs, row.name)
         if not matching_sids:
@@ -642,7 +697,7 @@ def _resolve_badge_filter(
             uncensored_sids.update(matching_sids)
         if "-sub" in name.lower():
             subtitled_sids.update(matching_sids)
-        if (row.file_type or "").lower() == "video" and _resolution_bucket(row.height) == resolution:
+        if (row.file_type or "").lower() == "video" and _resolution_bucket(row.height) in requested_resolutions:
             resolution_sids.update(matching_sids)
 
     video_ids = {row.id for row in video_rows if row.id}
@@ -692,7 +747,7 @@ def _resolve_badge_filter(
     include: frozenset[str] | None = None
     exclude: frozenset[str] | None = None
     censored_sids = found_sids - uncensored_sids
-    for desired, sids in ((uncensored, uncensored_sids), (censored, censored_sids), (subtitled, subtitled_sids), (True if resolution else None, resolution_sids)):
+    for desired, sids in ((uncensored, uncensored_sids), (censored, censored_sids), (subtitled, subtitled_sids), (True if requested_resolutions else None, resolution_sids)):
         if desired is None:
             continue
         matching_content_ids = _content_ids_for_sids(search_id_to_content_ids, sids)
@@ -958,7 +1013,7 @@ async def list_actress_works(
     uncensored: bool | None = Query(None),
     censored: bool | None = Query(None),
     subtitled: bool | None = Query(None),
-    resolution: str | None = Query(None, pattern="^(sd|720p|1080p|1440p|4k)$"),
+    resolution: str | None = Query(None, pattern="^(sd|720p|1080p|1440p|4k)(,(sd|720p|1080p|1440p|4k))*$"),
     torrent_status: str | None = Query(None, pattern="^(queued|downloading|stalled|completed|failed|skipped)$"),
     db: Session = Depends(db_session),
 ):

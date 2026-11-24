@@ -256,6 +256,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
   const [localFiles, setLocalFiles] = useState<File[]>([]);
   const [expandedDirectories, setExpandedDirectories] = useState<Set<string>>(new Set());
   const [showDirectoryTree, setShowDirectoryTree] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
   // Reset taskType and language when dialog opens (handles prop changes between opens)
   useEffect(() => {
@@ -317,36 +318,44 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
 
   // Handle create task
   const handleCreate = async () => {
-    if (localFiles.length === 0 || taskType === null) return;
+    if (localFiles.length === 0 || taskType === null || isCreating) return;
 
-    if (taskType === 'merge') {
-      const fileIds = localFiles.map(f => f.id);
-      mergeMutation.mutate(fileIds);
-      toast.success('Merge task created successfully!');
-    } else {
-      await Promise.all(localFiles.map(async file => {
-        const taskData: Omit<Task, 'id' | 'createdAt'> = {
-          file: file,
-          type: taskType,
-          status: 'queued' as const,
-          scene_progress: 0,
-          split_progress: 0,
-          subtitle_progress: 0,
-          subtitleLanguage: taskType === 'subtitle' || taskType === 'all' ? language : undefined,
-          scheduledFor: scheduleTask ? new Date(Date.now() + 3600000) : undefined,
-          overwrite_scenes: overwriteScenes,
-          overwrite_split: overwriteSplit,
-          bypass_split_guard: bypassSplitGuard,
-          bypass_scene_count_guard: bypassSceneCountGuard,
-          overwrite_subtitles: overwriteSubtitles,
-          scene_detector: sceneDetector || settings.scene_detector,
-          delete_video_after_completion: deleteVideoAfterCompletion,
-          nvenc_overwrite_original: nvencOverwriteOriginal,
-        };
-        await onCreateTask(taskData);
-      }));
-      await onTaskCreated?.();
-      onOpenChange(false);
+    setIsCreating(true);
+
+    try {
+      if (taskType === 'merge') {
+        const fileIds = localFiles.map(f => f.id);
+        mergeMutation.mutate(fileIds);
+        toast.success('Merge task created successfully!');
+      } else {
+        await Promise.all(localFiles.map(async file => {
+          const taskData: Omit<Task, 'id' | 'createdAt'> = {
+            file: file,
+            type: taskType,
+            status: 'queued' as const,
+            scene_progress: 0,
+            split_progress: 0,
+            subtitle_progress: 0,
+            subtitleLanguage: taskType === 'subtitle' || taskType === 'all' ? language : undefined,
+            scheduledFor: scheduleTask ? new Date(Date.now() + 3600000) : undefined,
+            overwrite_scenes: overwriteScenes,
+            overwrite_split: overwriteSplit,
+            bypass_split_guard: bypassSplitGuard,
+            bypass_scene_count_guard: bypassSceneCountGuard,
+            overwrite_subtitles: overwriteSubtitles,
+            scene_detector: sceneDetector || settings.scene_detector,
+            delete_video_after_completion: deleteVideoAfterCompletion,
+            nvenc_overwrite_original: nvencOverwriteOriginal,
+          };
+          await onCreateTask(taskData);
+        }));
+
+        // Closing must not wait for cache refresh/invalidation callbacks.
+        onOpenChange(false);
+        await onTaskCreated?.();
+      }
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -481,7 +490,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 px-1 flex-1 overflow-y-auto flex flex-col scrollbar min-[1920px]:grid min-[1920px]:grid-cols-2 min-[1920px]:gap-x-8 min-[1920px]:space-y-0">
+        <div className="space-y-4 py-4 px-1 flex-1 overflow-y-auto flex flex-col scrollbar">
           <div className="space-y-4 min-[1280px]:min-w-0 min-[1280px]:flex min-[1280px]:h-full min-[1280px]:min-h-0 min-[1280px]:flex-col">
           {
             localFiles.length > 0 && (
@@ -740,7 +749,8 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
               taskType === null ||
               createBlockedByExistingWork ||
               (taskType === 'merge' && !!getMergeValidationError(localFiles)) ||
-              mergeMutation.isPending
+              mergeMutation.isPending ||
+              isCreating
             }
             title={
               createBlockedByExistingWork

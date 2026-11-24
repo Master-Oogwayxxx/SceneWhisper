@@ -589,7 +589,7 @@ export const ActressTab = () => {
             uncensored: worksFilter.uncensored,
             censored: worksFilter.censored,
             subtitled: worksFilter.subtitled,
-            resolution: worksFilter.resolution.length ? worksFilter.resolution.join(',') : null,
+            resolution: worksFilter.resolution,
             releaseYear: worksFilter.releaseYear,
           },
           maxItemsPerRun: patch.maxItemsPerRun,
@@ -706,7 +706,7 @@ export const ActressTab = () => {
       while (skip < total) {
         const resp = await r18Api.getActressWorks(
           detail.id, skip, pageSize, worksSortBy, worksSortDir, worksSearch,
-          { fileExists: worksFilter.fileExists, localFileStatus: worksFilter.localFileStatus, uncensored: worksFilter.uncensored, censored: worksFilter.censored, subtitled: worksFilter.subtitled, resolution: worksFilter.resolution.length ? worksFilter.resolution.join(',') : null, opened: worksFilter.opened, releaseYear: worksFilter.releaseYear }
+          { fileExists: worksFilter.fileExists, localFileStatus: worksFilter.localFileStatus, uncensored: worksFilter.uncensored, censored: worksFilter.censored, subtitled: worksFilter.subtitled, resolution: worksFilter.resolution, opened: worksFilter.opened, releaseYear: worksFilter.releaseYear }
         )
         total = resp.total
         const filteredItems = filterActressWorksByOpenedState(resp.items, worksFilter.opened)

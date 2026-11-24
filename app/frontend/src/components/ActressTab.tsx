@@ -589,7 +589,7 @@ export const ActressTab = () => {
             uncensored: worksFilter.uncensored,
             censored: worksFilter.censored,
             subtitled: worksFilter.subtitled,
-            resolution: worksFilter.resolution,
+            resolution: worksFilter.resolution.join(',') || null,
             releaseYear: worksFilter.releaseYear,
           },
           maxItemsPerRun: patch.maxItemsPerRun,

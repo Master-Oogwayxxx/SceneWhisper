@@ -1,8 +1,9 @@
-import { Activity, Calendar, Download, FileVideo, Filter, Tag } from 'lucide-react'
+import { Activity, Calendar, ChevronsUpDown, Download, FileVideo, Filter, Tag } from 'lucide-react'
 import { Button } from './ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog'
 import { Label } from './ui/label'
 import { Checkbox } from './ui/checkbox'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { ActressWorksFilterState, ActressWorkLocalFileStatusFilter, ActressWorkResolutionFilter, ActressWorkTorrentStatusFilter, ActressWorkMetadataSourceFilter } from '@/lib/actress-works-filters'
 
@@ -28,6 +29,47 @@ const RESOLUTION_OPTIONS: { value: ActressWorkResolutionFilter; label: string }[
   { value: '1440p', label: '1440p' },
   { value: '4k', label: '4K' },
 ]
+
+function ResolutionMultiSelect({
+  values,
+  onChange,
+}: {
+  values: ActressWorkResolutionFilter[]
+  onChange: (values: ActressWorkResolutionFilter[]) => void
+}) {
+  const displayLabel = values.length === 0
+    ? 'All resolutions'
+    : values.length === 1
+      ? RESOLUTION_OPTIONS.find((option) => option.value === values[0])?.label ?? values[0]
+      : `${values.length} selected`
+
+  const toggle = (value: ActressWorkResolutionFilter) => {
+    onChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value])
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="h-9 w-full justify-between font-normal text-sm">
+          <span className="truncate">{displayLabel}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1" align="start">
+        {RESOLUTION_OPTIONS.map((option) => (
+          <div
+            key={option.value}
+            className="flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-2 hover:bg-accent"
+            onClick={() => toggle(option.value)}
+          >
+            <Checkbox checked={values.includes(option.value)} onCheckedChange={() => toggle(option.value)} />
+            <span className="text-sm">{option.label}</span>
+          </div>
+        ))}
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 interface Props {
   className?: string
@@ -141,27 +183,7 @@ export function ActressWorksFilterDialog({
             </div>
             <div className="flex flex-col gap-2">
               <Label className="flex items-center gap-2 text-sm font-medium"><Activity className="h-3.5 w-3.5" />Resolution</Label>
-              <div className="rounded-md border px-3 py-2">
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-                  {RESOLUTION_OPTIONS.map((option) => {
-                    const checked = draft.resolution.includes(option.value)
-                    return (
-                      <label key={option.value} className="flex cursor-pointer items-center gap-2 text-sm">
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(value) => onDraftChange({
-                            resolution: value
-                              ? [...draft.resolution, option.value]
-                              : draft.resolution.filter((resolution) => resolution !== option.value),
-                          })}
-                        />
-                        {option.label}
-                      </label>
-                    )
-                  })}
-                </div>
-                {draft.resolution.length === 0 && <p className="mt-1 text-xs text-muted-foreground">All resolutions</p>}
-              </div>
+              <ResolutionMultiSelect values={draft.resolution} onChange={(resolution) => onDraftChange({ resolution })} />
             </div>
             <div className="flex flex-col gap-2 pl-0.5">
               <Label className="flex items-center gap-2 text-sm font-medium"><Calendar className="h-3.5 w-3.5" />Release year</Label>

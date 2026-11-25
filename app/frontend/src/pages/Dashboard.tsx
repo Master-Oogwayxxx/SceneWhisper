@@ -381,10 +381,11 @@ export const Dashboard = ({ tab, setTab, statsMinimized, highlightedTaskId, high
 
     try {
       const response = await taskApi.addTaskVideo(newTask);
-      await Promise.all([
+      void Promise.all([
         queryClient.invalidateQueries({ queryKey: ['tasks'] }),
         queryClient.invalidateQueries({ queryKey: ['stats'] }),
         queryClient.invalidateQueries({ queryKey: ['tasks', 'active-file-badges'] }),
+        queryClient.invalidateQueries({ queryKey: ['r18'] }),
       ]);
       if (!response.duplicate) {
         toast.success('Task created successfully');

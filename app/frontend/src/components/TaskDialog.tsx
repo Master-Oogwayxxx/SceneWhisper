@@ -327,6 +327,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
         const fileIds = localFiles.map(f => f.id);
         mergeMutation.mutate(fileIds);
         toast.success('Merge task created successfully!');
+        onOpenChange(false);
       } else {
         await Promise.all(localFiles.map(async file => {
           const taskData: Omit<Task, 'id' | 'createdAt'> = {
@@ -418,6 +419,8 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
       ? `The following video(s) already have completed subtitle generation:\n${formatFileList(filesAlreadySubtitled)}\n\nNote: Turn on Overwrite existing to queue this again.`
       : '';
 
+  const totalSelectedSize = localFiles.reduce((total, file) => total + file.size, 0);
+
   /** Which overwrite stages have existing completed work (for warnings) */
   const sceneOverwriteApplicable = localFiles.length > 0 && tasks.length > 0 && filesAlreadyScened.length > 0;
   const splitOverwriteApplicable = localFiles.length > 0 && tasks.length > 0 && filesAlreadySplit.length > 0;
@@ -485,12 +488,12 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
           </DialogTitle>
           <DialogDescription>
             {localFiles.length > 0
-              ? `Configure processing options for ${localFiles.length} video files.`
+              ? `Configure processing options for ${localFiles.length} video files. Total size: ${formatFileSize(totalSelectedSize)}`
               : 'Configure processing options for your video file.'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4 px-1 flex-1 overflow-y-auto flex flex-col scrollbar">
+        <div className="space-y-4 py-4 px-1 flex-1 overflow-y-auto flex flex-col scrollbar min-[1920px]:grid min-[1920px]:grid-cols-2 min-[1920px]:gap-x-8 min-[1920px]:space-y-0">
           <div className="space-y-4 min-[1280px]:min-w-0 min-[1280px]:flex min-[1280px]:h-full min-[1280px]:min-h-0 min-[1280px]:flex-col">
           {
             localFiles.length > 0 && (

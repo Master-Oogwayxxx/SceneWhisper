@@ -327,8 +327,8 @@ export const ActressTab = () => {
     isFetching: worksFetching,
   } = useR18ActressWorks(
     selectedId,
-    0,
-    1000,
+    worksFilter.metadataSource === null ? worksPage : 0,
+    worksFilter.metadataSource === null ? worksPageSize : 1000,
     dbLoaded,
     worksSortBy,
     worksSortDir,

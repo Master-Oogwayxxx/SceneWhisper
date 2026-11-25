@@ -1070,6 +1070,9 @@ async def list_actress_works(
     )
     scraped_rows = await loop.run_in_executor(None, scraper_crud.list_videos_for_actress, actress_id)
     if scraped_rows:
+        requested_resolutions = {
+            value.strip() for value in (resolution or '').split(',') if value.strip()
+        }
         existing_by_code = {
             str(work.get("video_code") or work.get("content_id") or "").replace("-", "").upper(): work
             for work in rows
@@ -1077,6 +1080,14 @@ async def list_actress_works(
         scraped_only_count = 0
         for scraped in scraped_rows:
             code = scraped.videoCode or ""
+            if requested_resolutions:
+                scraped_resolution = scraper_crud._resolution_from_text(
+                    scraped.title,
+                    scraped.url,
+                    code,
+                )
+                if scraped_resolution not in requested_resolutions:
+                    continue
             key = code.replace("-", "").upper()
             if key in existing_by_code:
                 existing_by_code[key]["metadata_source"] = "merged"

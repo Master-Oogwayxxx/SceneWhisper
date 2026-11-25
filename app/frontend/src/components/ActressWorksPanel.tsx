@@ -296,7 +296,12 @@ export function ActressWorksPanel({
   )
   const displayedWorksTotal = worksFilter.metadataSource === null ? worksTotal : filteredWorks.length
   const displayedWorksTotalPages = worksFilter.metadataSource === null ? worksTotalPages : Math.max(1, Math.ceil(filteredWorks.length / worksPageSize))
-  const pagedFilteredWorks = filteredWorks.slice(worksPage * worksPageSize, (worksPage + 1) * worksPageSize)
+  // The API already returns the requested page for the normal metadata view.
+  // Metadata-source filtering remains client-side, so that mode still slices
+  // the larger result set fetched by ActressTab.
+  const pagedFilteredWorks = worksFilter.metadataSource === null
+    ? filteredWorks
+    : filteredWorks.slice(worksPage * worksPageSize, (worksPage + 1) * worksPageSize)
   const externalVideoTargets = useMemo(
     () => settings.external_video_targets.filter(isValidExternalVideoTarget),
     [settings.external_video_targets]

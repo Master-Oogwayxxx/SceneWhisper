@@ -320,6 +320,7 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
     const [draftIsGroupedView, setDraftIsGroupedView] = useState(initialFileFilters.isGroupedView);
     const [subtitleToEdit, setSubtitleToEdit] = useState<File | null>(null);
     const [fileTasksTarget, setFileTasksTarget] = useState<File | null>(null);
+    const [queuedTaskDeleteTarget, setQueuedTaskDeleteTarget] = useState<File | null>(null);
     const [isSubtitleEditorOpen, setIsSubtitleEditorOpen] = useState(false);
     const [sceneViewerFile, setSceneViewerFile] = useState<File | null>(null);
     const defaultItemsPerPage = settings.file_browser_page_size;
@@ -825,6 +826,28 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
                 .filter((id): id is string => Boolean(id)),
         );
     }, [fileBadgeTasksData]);
+    const queuedTasksForSelectedFiles = useMemo(() => {
+        const selectedFileIds = new Set(selectedFiles.map((file) => file.id));
+        return (fileBadgeTasksData ?? []).filter((task) => (
+            task.status === 'queued' && task.file?.id && selectedFileIds.has(task.file.id)
+        ));
+    }, [fileBadgeTasksData, selectedFiles]);
+    const queuedTasksForFile = (fileId: string) => (fileBadgeTasksData ?? []).filter((task) => (
+        task.status === 'queued' && task.file?.id === fileId
+    ));
+    const handleDeleteQueuedTasks = async () => {
+        try {
+            await Promise.all(queuedTasksForSelectedFiles.map((task) => taskApi.deleteTask(task.id)));
+            toast.success(`Deleted ${queuedTasksForSelectedFiles.length} queued task${queuedTasksForSelectedFiles.length === 1 ? '' : 's'}`);
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+                queryClient.invalidateQueries({ queryKey: ['tasks', 'active-file-badges'] }),
+                queryClient.invalidateQueries({ queryKey: ['stats'] }),
+            ]);
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Failed to delete queued tasks');
+        }
+    };
     const processingTaskIdsByFileId = useMemo(() => {
         const taskIds = new Map<string, string>();
         for (const task of fileBadgeTasksData ?? []) {
@@ -1313,6 +1336,14 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
                     {videoFile && (
                         <ContextMenuItem className="cursor-pointer" onClick={() => setFileTasksTarget(originalFile)}>
                             View Tasks
+                        </ContextMenuItem>
+                    )}
+                    {queuedTasksForFile(originalFile.id).length > 0 && (
+                        <ContextMenuItem
+                            className="cursor-pointer text-destructive focus:text-destructive"
+                            onClick={() => setQueuedTaskDeleteTarget(originalFile)}
+                        >
+                            Delete Queued Tasks ({queuedTasksForFile(originalFile.id).length})
                         </ContextMenuItem>
                     )}
                     {videoFile && (
@@ -1845,6 +1876,8 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
             showSelectAll={layoutMode !== 'tree' && !isGroupedView}
             filesCount={files.length}
             onToggleSelectAll={() => selectedFiles.length === files.length ? setSelectedFiles([]) : setSelectedFiles(files)}
+            queuedTaskCount={queuedTasksForSelectedFiles.length}
+            onDeleteQueuedTasks={handleDeleteQueuedTasks}
         />
         {layoutMode === 'tree' && treeBreadcrumbs.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -2022,6 +2055,41 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
                         onClick={handleDeleteSelectedTreeDirectories}
                     >
                         Delete
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={queuedTaskDeleteTarget !== null} onOpenChange={(open) => { if (!open) setQueuedTaskDeleteTarget(null) }}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Delete queued tasks?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will delete {queuedTaskDeleteTarget ? queuedTasksForFile(queuedTaskDeleteTarget.id).length : 0} queued task{queuedTaskDeleteTarget && queuedTasksForFile(queuedTaskDeleteTarget.id).length === 1 ? '' : 's'} for &quot;{queuedTaskDeleteTarget?.name}&quot;. Processing tasks will not be affected.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={async () => {
+                            const target = queuedTaskDeleteTarget;
+                            if (!target) return;
+                            setQueuedTaskDeleteTarget(null);
+                            const tasks = queuedTasksForFile(target.id);
+                            try {
+                                await Promise.all(tasks.map((task) => taskApi.deleteTask(task.id)));
+                                toast.success(`Deleted ${tasks.length} queued task${tasks.length === 1 ? '' : 's'}`);
+                                await Promise.all([
+                                    queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+                                    queryClient.invalidateQueries({ queryKey: ['tasks', 'active-file-badges'] }),
+                                    queryClient.invalidateQueries({ queryKey: ['stats'] }),
+                                ]);
+                            } catch (error) {
+                                toast.error(error instanceof Error ? error.message : 'Failed to delete queued tasks');
+                            }
+                        }}
+                    >
+                        Delete queued tasks
                     </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>

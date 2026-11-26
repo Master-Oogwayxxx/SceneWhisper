@@ -46,7 +46,8 @@ async def test_enqueue_with_priority_puts_tuple():
     tm = TaskManager()
     tm.tasks_db["t1"] = _make_task("t1", TaskType.ALL)
     mock_settings = _make_settings()
-    with patch("src.task_manager.get_settings", return_value=mock_settings):
+    with patch("src.task_manager.get_settings", return_value=mock_settings), \
+         patch("src.task_manager.bulk_update_queue_positions") as update_positions:
         await tm._enqueue_with_priority("t1")
     entry = tm.task_queue.get_nowait()
     assert isinstance(entry, tuple)
@@ -54,6 +55,21 @@ async def test_enqueue_with_priority_puts_tuple():
     rank, _, task_id = entry
     assert task_id == "t1"
     assert rank == 0  # "all" is index 0
+    update_positions.assert_called_once_with(["t1"])
+
+
+@pytest.mark.asyncio
+async def test_enqueue_with_priority_persists_all_tasks_in_queue_order():
+    tm = TaskManager()
+    tm.tasks_db["scene1"] = _make_task("scene1", TaskType.SCENE)
+    tm.tasks_db["all1"] = _make_task("all1", TaskType.ALL)
+    mock_settings = _make_settings()
+    with patch("src.task_manager.get_settings", return_value=mock_settings), \
+         patch("src.task_manager.bulk_update_queue_positions") as update_positions:
+        await tm._enqueue_with_priority("scene1")
+        await tm._enqueue_with_priority("all1")
+
+    assert update_positions.call_args_list[-1].args == (["all1", "scene1"],)
 
 
 @pytest.mark.asyncio

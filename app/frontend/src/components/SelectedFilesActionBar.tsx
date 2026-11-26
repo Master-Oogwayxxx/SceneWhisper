@@ -114,6 +114,8 @@ interface SelectedFilesActionBarProps {
     showSelectAll: boolean;
     filesCount: number;
     onToggleSelectAll: () => void;
+    queuedTaskCount: number;
+    onDeleteQueuedTasks: () => Promise<void>;
 }
 
 export function SelectedFilesActionBar({
@@ -135,6 +137,8 @@ export function SelectedFilesActionBar({
     showSelectAll,
     filesCount,
     onToggleSelectAll,
+    queuedTaskCount,
+    onDeleteQueuedTasks,
 }: SelectedFilesActionBarProps) {
     const { settings } = useSettings();
     const queryClient = useQueryClient();
@@ -287,6 +291,33 @@ export function SelectedFilesActionBar({
                     <Plus className="h-3.5 w-3.5" />
                     New Task
                 </Button>
+                {queuedTaskCount > 0 && (
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-1.5 text-destructive hover:text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete queued tasks ({queuedTaskCount})
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Delete queued tasks?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will delete {queuedTaskCount} queued task{queuedTaskCount === 1 ? '' : 's'} for the selected file{selectedFiles.length === 1 ? '' : 's'}. Processing tasks will not be affected.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    onClick={() => void onDeleteQueuedTasks()}
+                                >
+                                    Delete queued tasks
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                )}
                 {selectedFiles.length >= 2 && (
                     <Button
                         variant="outline"

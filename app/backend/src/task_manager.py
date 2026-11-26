@@ -899,6 +899,13 @@ class TaskManager:
         priority_order: list[str] = json.loads(raw) if raw else ["all", "merge", "subtitle", "split", "scene", "analyze_frame_pacing", "nvenc_frame_pacing", "remux"]
         rank = self._rank_for_task(task_id, priority_order)
         await self.task_queue.put((rank, time.monotonic(), task_id))
+        await self._persist_queue_positions()
+
+    async def _persist_queue_positions(self) -> None:
+        """Persist the current priority-queue order for the queued-task display."""
+        ordered_task_ids = [entry[2] for entry in sorted(self.task_queue._queue)]
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(_TASK_DB_EXECUTOR, bulk_update_queue_positions, ordered_task_ids)
 
     async def rerank_queue(self, priority_order: list[str]) -> None:
         """Drain the queue and re-enqueue all tasks with updated priority ranks."""

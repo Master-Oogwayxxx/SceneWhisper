@@ -31,6 +31,16 @@ _SOURCE_FILE_NOT_FOUND_ERRORS = {
 }
 _PROGRESS_PERSIST_INTERVAL_SECONDS = 1.0
 _PROGRESS_PERSIST_DELTA = 1.0
+_DEFAULT_PRIORITY_ORDER = [
+    "all",
+    "merge",
+    "subtitle",
+    "split",
+    "scene",
+    "analyze_frame_pacing",
+    "nvenc_frame_pacing",
+    "remux",
+]
 
 
 def _should_delete_failed_task(error: str | None) -> bool:
@@ -896,10 +906,19 @@ class TaskManager:
         loop = asyncio.get_running_loop()
         settings = await loop.run_in_executor(_TASK_DB_EXECUTOR, get_settings)
         raw = settings.task_type_priority
-        priority_order: list[str] = json.loads(raw) if raw else ["all", "merge", "subtitle", "split", "scene", "analyze_frame_pacing", "nvenc_frame_pacing", "remux"]
+        try:
+            priority_order = json.loads(raw) if raw else list(_DEFAULT_PRIORITY_ORDER)
+            if not isinstance(priority_order, list) or not all(isinstance(item, str) for item in priority_order):
+                raise ValueError("task_type_priority must be a JSON list of strings")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            logging.warning("Invalid task_type_priority setting; using the default task order")
+            priority_order = list(_DEFAULT_PRIORITY_ORDER)
         rank = self._rank_for_task(task_id, priority_order)
         await self.task_queue.put((rank, time.monotonic(), task_id))
-        await self._persist_queue_positions()
+        try:
+            await self._persist_queue_positions()
+        except Exception:
+            logging.exception("Unable to persist queue positions while enqueuing task %s", task_id)
 
     async def _persist_queue_positions(self) -> None:
         """Persist the current priority-queue order for the queued-task display."""

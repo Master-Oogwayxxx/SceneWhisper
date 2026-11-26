@@ -73,6 +73,19 @@ async def test_enqueue_with_priority_persists_all_tasks_in_queue_order():
 
 
 @pytest.mark.asyncio
+async def test_enqueue_with_priority_can_defer_position_persistence():
+    tm = TaskManager()
+    tm.tasks_db["t1"] = _make_task("t1", TaskType.ALL)
+    mock_settings = _make_settings()
+    with patch("src.task_manager.get_settings", return_value=mock_settings), \
+         patch("src.task_manager.bulk_update_queue_positions") as update_positions:
+        await tm._enqueue_with_priority("t1", persist_positions=False)
+
+    assert tm.task_queue.get_nowait()[2] == "t1"
+    update_positions.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_higher_priority_type_dequeued_first():
     tm = TaskManager()
     tm.tasks_db["scene1"] = _make_task("scene1", TaskType.SCENE)

@@ -120,7 +120,15 @@ async def lifespan(app: FastAPI):
 
     # Re-queue all tasks for processing
     for task_id in tasks_to_requeue:
-        await task_manager._enqueue_with_priority(task_id)
+        await task_manager._enqueue_with_priority(task_id, persist_positions=False)
+
+    # Persist once after the complete queue is restored. Persisting after every
+    # insertion makes startup quadratic for installations with large queues.
+    if tasks_to_requeue:
+        try:
+            await task_manager._persist_queue_positions()
+        except Exception:
+            logging.exception("Unable to persist recovered queue positions during startup")
 
     task_processors = [asyncio.create_task(task_manager.task_processor()) for _ in range(3)]
     sha256_task = asyncio.create_task(sha256_worker())

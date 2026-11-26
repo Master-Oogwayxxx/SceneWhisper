@@ -901,7 +901,7 @@ class TaskManager:
         except ValueError:
             return len(priority_order)
 
-    async def _enqueue_with_priority(self, task_id: str) -> None:
+    async def _enqueue_with_priority(self, task_id: str, *, persist_positions: bool = True) -> None:
         """Put task_id into the priority queue with rank derived from current settings."""
         loop = asyncio.get_running_loop()
         settings = await loop.run_in_executor(_TASK_DB_EXECUTOR, get_settings)
@@ -915,10 +915,11 @@ class TaskManager:
             priority_order = list(_DEFAULT_PRIORITY_ORDER)
         rank = self._rank_for_task(task_id, priority_order)
         await self.task_queue.put((rank, time.monotonic(), task_id))
-        try:
-            await self._persist_queue_positions()
-        except Exception:
-            logging.exception("Unable to persist queue positions while enqueuing task %s", task_id)
+        if persist_positions:
+            try:
+                await self._persist_queue_positions()
+            except Exception:
+                logging.exception("Unable to persist queue positions while enqueuing task %s", task_id)
 
     async def _persist_queue_positions(self) -> None:
         """Persist the current priority-queue order for the queued-task display."""

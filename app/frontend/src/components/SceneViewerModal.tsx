@@ -1117,7 +1117,7 @@ export const SceneViewerModal = ({ file, isOpen, onClose }: SceneViewerModalProp
                       hasOverlappingScenes(scenes, editStates, scenesToDelete)
                     }
                   >
-                    {updateMutation.isPending ? (
+                    {updateMutation.isPending && !closeAfterSaveRef.current ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         Saving...

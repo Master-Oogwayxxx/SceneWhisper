@@ -168,11 +168,11 @@ async def add_task_video(task: Task, db: Session = Depends(db_session)):
         # Check for existing outputs unless the relevant overwrite flag is set.
         if task.type == TaskType.SCENE or task.type == TaskType.SPLIT or task.type == TaskType.ALL:
             if not task.overwrite_split and not task.bypass_split_guard:
-                if has_completed_split(file_id):
+                if await asyncio.to_thread(has_completed_split, file_id):
                     raise HTTPException(status_code=409, detail=f"Video {task.file.name} has already been split. Please use a different video or enable overwrite.")
 
                 # Check if file itself is a split file
-                if is_pyscenedetect_split(path):
+                if await asyncio.to_thread(is_pyscenedetect_split, path):
                     await emit_notification(
                         type=NotificationType.TASK_FAILED,
                         title=f"Cannot queue task: {task.file.name}",
@@ -182,7 +182,7 @@ async def add_task_video(task: Task, db: Session = Depends(db_session)):
 
                     raise HTTPException(status_code=422, detail=f"{path.name} is a split file and cannot be queued.")
 
-                existing_splits = find_pyscenedetect_splits(path)
+                existing_splits = await asyncio.to_thread(find_pyscenedetect_splits, path)
 
                 if existing_splits:
                     await emit_notification(
@@ -195,7 +195,7 @@ async def add_task_video(task: Task, db: Session = Depends(db_session)):
 
         if task.type == TaskType.SUBTITLE or task.type == TaskType.ALL:
             if not task.overwrite_subtitles:
-                if has_completed_subtitles(file_id):
+                if await asyncio.to_thread(has_completed_subtitles, file_id):
                     raise HTTPException(status_code=409, detail=f"Video {task.file.name} already has subtitles. Please use a different video or enable overwrite.")
 
                 # Fallback: check filesystem for orphaned subtitle files (in case DB record was deleted)

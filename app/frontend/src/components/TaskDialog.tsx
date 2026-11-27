@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Scissors, Subtitles, ScanSearch, Calendar, Clock, Globe, X, ChevronRight, ChevronDown, Folder, FileText, Sliders, Wand2, RefreshCcw, Shuffle, SearchCheck, Trash2 } from 'lucide-react';
+import { Scissors, Subtitles, ScanSearch, Calendar, Clock, Globe, X, ChevronRight, ChevronDown, Folder, FileText, Sliders, Wand2, RefreshCcw, Shuffle, SearchCheck, Trash2, Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -325,7 +325,7 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
     try {
       if (taskType === 'merge') {
         const fileIds = localFiles.map(f => f.id);
-        mergeMutation.mutate(fileIds);
+        await mergeMutation.mutateAsync(fileIds);
         toast.success('Merge task created successfully!');
         onOpenChange(false);
       } else {
@@ -767,7 +767,10 @@ export function TaskDialog({ open, onOpenChange, selectedFile, setSelectedFile, 
                   : undefined
             }
           >
-            {submitLabel ?? (taskType === 'merge' ? 'Create Merge Task' : 'Create Task')}{localFiles.length > 1 ? ` (${localFiles.length})` : ''}
+            {(isCreating || mergeMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isCreating
+              ? 'Creating...'
+              : submitLabel ?? (taskType === 'merge' ? 'Create Merge Task' : 'Create Task')}{!isCreating && localFiles.length > 1 ? ` (${localFiles.length})` : ''}
           </Button>
         </div>
       </DialogContent>

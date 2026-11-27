@@ -1243,16 +1243,22 @@ const FileBrowserTab: React.FC<FileBrowserProps> = ({
         if (selectedFiles.length < 2) return;
 
         try {
-            await taskApi.mergeFiles(selectedFiles.map((file) => file.id));
-            toast.success(`Merge task created for ${selectedFiles.length} files`);
+            const fileCount = selectedFiles.length;
+            const mergeRequest = taskApi.mergeFiles(selectedFiles.map((file) => file.id));
+            toast.promise(mergeRequest, {
+                loading: `Creating merge task for ${fileCount} files...`,
+                success: `Merge task created for ${fileCount} files`,
+                error: (error) => error instanceof Error ? error.message : 'Failed to create merge task',
+            });
+            await mergeRequest;
             setSelectedFiles([]);
             await Promise.all([
                 queryClient.invalidateQueries({ queryKey: ['tasks'] }),
                 queryClient.invalidateQueries({ queryKey: ['tasks', 'active-file-badges'] }),
                 queryClient.invalidateQueries({ queryKey: ['stats'] }),
             ]);
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : 'Failed to create merge task');
+        } catch {
+            // The merge request error is already shown by toast.promise above.
         }
     };
 
